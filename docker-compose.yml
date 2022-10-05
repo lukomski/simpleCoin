@@ -1,0 +1,17 @@
+version: "3.9"
+services:
+  node0:
+    build: .
+    container_name: sc_node0
+    ports:
+      - "5000:5000"
+    networks:
+      - scnetwork
+    environment:
+      - FLASK_DEBUG=1
+      - FIRST_NODE=true
+      - NODE_NAME=node0
+    command: python3 -m flask run --host=0.0.0.0
+networks:
+  scnetwork:
+    name: scnetwork
