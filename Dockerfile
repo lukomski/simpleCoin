@@ -1,12 +1,8 @@
-FROM ubuntu:22.04
-
-COPY ./src /app
-
-RUN apt update
-
-RUN apt install -y python3-pip iproute2
+FROM python:3.11.0rc2-slim-buster
 
 WORKDIR /app
+
+COPY ./src/requirements.txt ./
 
 RUN pip3 install -r requirements.txt
 

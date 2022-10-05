@@ -5,6 +5,8 @@ services:
     container_name: sc_node0
     ports:
       - "5000:5000"
+    volumes:
+      - ./src:/app
     networks:
       - scnetwork
     environment:

@@ -1,33 +1,11 @@
 from flask import Flask, request, render_template
 import os
-import json 
-import utils
+import json
 import socket
+from CryptoNode import Node
+
 app = Flask(__name__)
-
-store = {}
-store["nodes"] = []
-store["nodeName"] = os.environ.get('NODE_NAME')
-store["ip"] = socket.gethostbyname(socket.gethostname())
-
-def initialization():
-    store["privateKey"], store["publicKey"] = utils.generatePrivateAndPublicKeys()
-    if os.environ.get('FIRST_NODE') == "true":
-        print('FIRST NODE')
-        # add myself to the list of nodes
-        store["nodes"] = [{
-            "publicKey": str(store["publicKey"]),
-            "ip": str(store["ip"])
-        }]
-        pass
-    else:
-        print('NEXT NODE')
-        doorman_address = os.environ.get('DOORMAN_ADDRESS')
-        utils.enterToNetwork(doorman_address)
-        pass
-    pass
-
-initialization()
+node = Node(None)
 
 @app.route('/')
 def hello_geek():
@@ -35,7 +13,15 @@ def hello_geek():
 
 @app.route('/nodes')
 def get_nodes():
-    return json.dumps(store['nodes'])
+    pub_list = []
+    for address, pub_key in node.pub_list:
+        pub_list.append(
+            {
+                'address': address,
+                'public_key': str(pub_key)
+            }
+        )
+    return json.dumps(pub_list)
 
 @app.route('/nodeName')
 def get_node_name():
@@ -49,16 +35,16 @@ def get_public_key():
 def get_node():
     return store['publicKey']
 
-# for tests
-@app.route('/endecrypt')
-def endecrypt_message():
-    message = request.args.get('message')
-    return utils.encryptMessage(message, store['privateKey'])
+# # for tests
+# @app.route('/endecrypt')
+# def endecrypt_message():
+#     message = request.args.get('message')
+#     return utils.encryptMessage(message, store['privateKey'])
 
-@app.route('/sign')
-def sign_message():
-    message = request.args.get('message')
-    return utils.signMessage(message, store['privateKey'])
+# @app.route('/sign')
+# def sign_message():
+#     message = request.args.get('message')
+#     return utils.signMessage(message, store['privateKey'])
 
 if __name__ == "__main__":
     app.run(debug=True)
