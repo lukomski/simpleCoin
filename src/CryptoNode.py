@@ -1,6 +1,6 @@
-from nacl.public import PrivateKey, PublicKey, Box
-from nacl.utils import random, EncryptedMessage
+from nacl.public import PrivateKey, PublicKey, SealedBox
 from nacl.encoding import HexEncoder
+from nacl.hash import sha256
 import socket
 import requests
 import threading
@@ -16,7 +16,6 @@ class Node():
     ip = None
     port = None
     app = None
-    nonce = None
 
     def __init__(self, network_node_address, app):
         privateKey = PrivateKey.generate()
@@ -27,7 +26,6 @@ class Node():
 
         self.__private_key = private_encode_key
         self.__public_key = public_encode_key
-        # self.nonce = random(Box.NONCE_SIZE)
         self.app = app
         if network_node_address is not None:
             self.pub_list = []
@@ -47,9 +45,6 @@ class Node():
     def get_public_key(self):
         return self.__public_key
 
-    # def get_private_key(self):
-    #    return self.__private_key
-
     def update_pub_list(self, new_pub_list):
         self.pub_list = new_pub_list
 
@@ -67,19 +62,64 @@ class Node():
 
     def send_message(self, message: bytes, reveiver_public_key: bytes):
         # return {"message": str(message), "reveiver_public_key": str(reveiver_public_key)}
-        private_key = PrivateKey(self.__private_key, HexEncoder)
-        public_key = PublicKey(reveiver_public_key, HexEncoder)
-        box = Box(private_key, public_key)
-        encrypted = box.encrypt(message, self.nonce, HexEncoder)
-
+        object = self.__sign_message(message, reveiver_public_key)
         address = self.getAddressByPublicKey(reveiver_public_key)
-        requests.get(
-            url=f"http://{address}/read", params={"message": encrypted, "nounce": self.nonce})
+        requests.post(
+            url=f"http://{address}/message", json=object)
 
-    def read_message(self, encrypted_message: bytes, sender_public_key: bytes, nonce=None):
+    def read_message(self, encrypted_object: object, sender_public_key: bytes):
+        trusted = True
+        if not self.__verifyMessage(encrypted_object, sender_public_key):
+            self.app.logger.error("Message sender must not be trusted")
+            trusted = False
+
         private_key = PrivateKey(self.__private_key, HexEncoder)
-        public_key = PublicKey(sender_public_key, HexEncoder)
+        box = SealedBox(private_key)
+        message = box.decrypt(str.encode(encrypted_object["message"], 'utf8'),
+                              None, HexEncoder).decode("utf8")
 
-        box = Box(private_key, public_key)
-        message = box.decrypt(encrypted_message, None, HexEncoder)
-        self.app.logger.error(f'READ message: {message.decode("utf-8")}')
+        self.app.logger.error(f'READ message: {message}')
+
+        return {
+            "trusted": trusted,
+            "message": message
+        }
+
+    def __sign_message(self, message: bytes, reveiver_public_key: bytes):
+        digest = sha256(message, encoder=HexEncoder)
+
+        # encrypt digest
+        private_key = PrivateKey(self.__private_key, HexEncoder)
+        box = SealedBox(private_key)
+        encrypted_digest = box.decrypt(
+            digest)
+
+        self.app.logger.error(f"encrypted_digest: {encrypted_digest}")
+
+        # encrypt message
+        public_key = PublicKey(reveiver_public_key, HexEncoder)
+        box = SealedBox(public_key)
+        encrypted_message = box.encrypt(
+            message)
+
+        return {
+            "message": encrypted_message.decode("utf8"),
+            "hash": digest.decode("utf8"),
+            "signed_hash": encrypted_digest.decode("utf8")
+        }
+
+    def __verifyMessage(self, received_object, sender_public_key: bytes):
+        expected_digest = str.encode(received_object["hash"], 'utf8')
+        digest_to_decrypt = str.encode(
+            received_object["signed_hash"], 'utf8')
+
+        # encrypt digest
+        public_key = PublicKey(sender_public_key, HexEncoder)
+        box = SealedBox(public_key)
+        decrypted_digest = box.encrypt(digest_to_decrypt)
+
+        self.app.logger.error(f"decrypted_digest: {str(decrypted_digest)}")
+        self.app.logger.error(
+            f"expected_digest: {str(expected_digest)}")
+
+        return False if decrypted_digest != expected_digest else True

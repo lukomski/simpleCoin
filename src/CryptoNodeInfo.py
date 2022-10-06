@@ -10,5 +10,5 @@ class NodeInfo:
     def toJSON(self):
         return {
             "address": self.address,
-            "public_key": self.public_key.decode("utf-8")
+            "public_key": self.public_key.decode("utf8")
         }

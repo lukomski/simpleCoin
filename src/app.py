@@ -1,4 +1,3 @@
-import json
 from CryptoNodeInfo import NodeInfo
 from flask import Flask, request, render_template
 import os
@@ -29,7 +28,7 @@ def get_nodes():
 @app.route('/publicKey')
 def get_public_key():
     return {
-        'public_key': node.get_public_key().decode('utf-8')
+        'public_key': node.get_public_key().decode('utf8')
     }
 
 
@@ -93,7 +92,7 @@ def connect_node():
     pubkey_response_obj = pubkey_response.json()
 
     new_node_info = NodeInfo(request_addr, str.encode(
-        pubkey_response_obj['public_key'], 'utf-8'))
+        pubkey_response_obj['public_key'], 'utf8'))
     # node found and it needs to be updated
     if node_idx != -1:
         updated_nodes = [*node.pub_list]
@@ -139,7 +138,7 @@ def update_pub_list():
         # rewrite existing (and valid) connections
         should_skip = False
         for nodeInfo in node.pub_list:
-            if (nodeInfo.address == connection['address'] and nodeInfo.public_key.decode("utf-8") == connection['public_key']):
+            if (nodeInfo.address == connection['address'] and nodeInfo.public_key.decode("utf8") == connection['public_key']):
                 update_nodes.append(nodeInfo)
                 should_skip = True
                 break
@@ -156,9 +155,9 @@ def update_pub_list():
                 break
 
         nodeInfo = NodeInfo(connection['address'], str.encode(
-            connection['public_key'], 'utf-8'))
+            connection['public_key'], 'utf8'))
         # need to update public_key for specific ip address
-        if ip_found_idx != -1 and node.pub_list[ip_found_idx].public_key.encode('utf-8') != connection['public_key']:
+        if ip_found_idx != -1 and node.pub_list[ip_found_idx].public_key.encode('utf8') != connection['public_key']:
             update_nodes.append(nodeInfo)
             continue
 
@@ -184,10 +183,14 @@ def update_pub_list():
     return {'message': 'OK'}, 200
 
 
-@ app.route("/send")
+@app.route("/message:invoke", methods=['POST'])
 def send_message():
-    message = str.encode(request.args.get('message'), 'utf-8')
-    address = request.args.get('address')
+
+    object = request.get_json()
+
+    message = str.encode(object["message"], 'utf8')
+
+    address = object["address"]
     sender_pkey = node.getPublicKeyByAddress(address)
     if sender_pkey == None:
         return {
@@ -200,15 +203,16 @@ def send_message():
     return "ok"
 
 
-@ app.route("/read")
+@ app.route("/message", methods=["POST"])
 def read_message():
     request_addr = f"{request.remote_addr}:5000"
-    encrypted_message = str.encode(request.args.get('message'), 'utf-8')
-    nounce = str.encode(request.args.get('nonce'),
-                        'utf-8') if request.args.get('nonce') else None
+    object = request.get_json()
+
     sender_pkey = node.getPublicKeyByAddress(request_addr)
-    node.read_message(encrypted_message, sender_pkey, nounce)
-    return "ok"
+    object = node.read_message(object, sender_pkey)
+    return {
+        "trusted": object["trusted"]
+    }, 200 if object["trusted"] else 400
 
 
 if __name__ == "__main__":
