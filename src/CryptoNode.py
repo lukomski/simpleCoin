@@ -1,11 +1,13 @@
 from nacl.public import PrivateKey, Box
 import socket
 import requests
+import threading
+
 
 class Node():
-    __private_key = None # TODO symmetrical encryption 
+    __private_key = None  # TODO symmetrical encryption
     __public_key = None
-    
+
     pub_list = None
     ip = None
     port = None
@@ -13,13 +15,19 @@ class Node():
     def __init__(self, network_node_address):
         self.__private_key = PrivateKey.generate()
         self.__public_key = self.__private_key.public_key
-        
+
         if network_node_address is not None:
             self.pub_list = []
-            requests.post(url = 'http://' + network_node_address + "/connect-node", json = {})
+
+            def f():
+                requests.post(url='http://' +
+                              network_node_address + "/connect-node", json={})
+            start_time = threading.Timer(1, f)
+            start_time.start()
         else:
             self.pub_list = [
-                (socket.gethostbyname(socket.gethostname()), str(self.__public_key))
+                (f"{socket.gethostbyname(socket.gethostname())}:5000",
+                 str(self.__public_key))
             ]
 
     def get_public_key(self):
