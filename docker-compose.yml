@@ -9,10 +9,6 @@ services:
       - ./src:/app
     networks:
       - scnetwork
-    environment:
-#      - FLASK_DEBUG=0
-      - FIRST_NODE=true
-      - NODE_NAME=node0
     command: python3 -m flask run --host=0.0.0.0
 networks:
   scnetwork:
