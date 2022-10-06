@@ -80,7 +80,17 @@ def connect_node():
 
 @ app.route("/update-pub-list", methods=['POST'])
 def update_pub_list():
-    # updated_connections = request.get_json() #json.loads(request.form)
+    updated_connections = request.get_json() #json.loads(request.form)
+    for (address, pub_key) in updated_connections:
+        app.logger.info(address)
+        app.logger.info(pub_key)
+        app.logger.info(">>>>>>>>>>>>>>>")
+
+    updated_connections_list = []
+    for connection in updated_connections:
+        updated_connections_list.append((connection['address'], connection['public_key']))
+
+    node.update_pub_list(updated_connections_list)
     return {
         'message': 'OK'
     }
