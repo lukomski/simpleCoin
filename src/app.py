@@ -7,7 +7,7 @@ from CryptoNode import Node
 
 app = Flask(__name__)
 
-node = Node(os.environ.get("REFERENCE_ADDRESS", None))
+node = Node(os.environ.get("REFERENCE_ADDRESS", None), app)
 print(node.pub_list)
 
 
@@ -87,4 +87,4 @@ def update_pub_list():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=False)
