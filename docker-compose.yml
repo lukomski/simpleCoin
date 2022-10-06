@@ -13,7 +13,7 @@ services:
       - FLASK_DEBUG=1
       - FIRST_NODE=true
       - NODE_NAME=node0
-    command: python3 -m flask run --host=0.0.0.0
+    command: python3 -m flask run --host=0.0.0.0 --port=5000 --with-threads
 networks:
   scnetwork:
     name: scnetwork

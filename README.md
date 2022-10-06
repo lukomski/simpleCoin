@@ -2,6 +2,11 @@
 
 ## Stack technologiczny
 
+# Uproszczona wersja aplikacji aby rozwiązać problem
+
+Kiedy node1 robi zapytanie przy uruchomieniu do Node0. To node0 robi zapytanie do nas, ale nas nie może osiągnąć.
+Kiedy ręcznie ponowimy próbę przy pomocy GET http://localhost:5001/make_request_to_node_0 to wszystko działa
+
 Flask + docker
 
 ## Uruchomienie

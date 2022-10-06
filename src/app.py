@@ -1,94 +1,44 @@
-from flask import Flask, request, render_template
+from flask import Flask
 import os
-import json
-import socket
-from CryptoNode import Node
+import requests
 
 app = Flask(__name__)
 
-node = Node(os.environ.get("REFERENCE_ADDRESS", None))
-print(node.pub_list)
-
-@app.route('/')
-def hello_geek():
-    return render_template('home.html')
-
-@app.route('/nodes')
-def get_nodes():
-    pub_list = []
-    for address, pub_key in node.pub_list:
-        pub_list.append(
-            {
-                'address': address,
-                'public_key': str(pub_key)
-            }
-        )
-    return json.dumps(pub_list)
-
-@app.route('/nodeName')
-def get_node_name():
-    return store['nodeName']
 
 @app.route('/publicKey')
 def get_public_key():
-    return json.dumps(
-        {
-            'public_key': str(node.get_public_key())
-        }
-    )
+    return "OK"
 
-@app.route('/node', methods=['POST'])
-def get_node():
-    return store['publicKey']
+# node0 IP - 172.19.0.2 - FIRST NODE
+# node1 IP - 172.19.0.3
 
-@app.route("/connect-node", methods=['POST'])
-def connect_node():
-    request_ip = request.remote_addr
 
-    pubkey_response = requests.get(url = "http://" + request_ip + "/publicKey")
-    pubkey_response_obj = json.loads(pubkey_response)
+@app.route('/make_request_to_other_app')
+def f():
+    # The request get public key of Node1.
+    # It works if is invoked by node1/make_request_to_node_0
+    # Do NOT works if is invoked by node1 on start applicatio for example like in the statement 4 lines below.
+    # Here cannot reach node1 from node0
+    requests.get(url=f"http://172.19.0.3:5000/publicKey")
+    return "Git"
 
-    node.update_pub_list([*node.pub_list, (pubkey_response_obj['address'], pubkey_response_obj['public_key'])])
 
-    updated_connections = []
-    for address, pub_key in node.pub_list:
-        updated_connections.append(
-            {
-                'address': address,
-                'public_key': pub_key
-            }
-        )
+@app.route('/make_request_to_node_0')
+def make_request_to_node_0():
+    requests.get(url=f"http://172.19.0.2:5000/make_request_to_other_app")
+    return "Git"
 
-    for connection in node.pub_list:
-        if connection[1] == node.get_public_key():
-            continue
-        requests.post(
-            url = "http://" + connection[0] + "/update-pub-list",
-            json = json.dumps(updated_connections)
-        )
+# Problem:
+#   - When node1 call node0/make_request_to_other_app on init application - it does not work
+#   - When node1 call node0/make_request_to_other_app invoked manually - it does work correcly
+# Tried add timeout but not helped.
 
-    return {
-        'message': 'OK',
-        'status': 200
-    }
 
-@app.route("/update-pub-list", methods=['POST'])
-def update_pub_list():
-    #updated_connections = request.get_json() #json.loads(request.form)
-    return {
-        'message': 'OK'
-    }
-
-# # for tests
-# @app.route('/endecrypt')
-# def endecrypt_message():
-#     message = request.args.get('message')
-#     return utils.encryptMessage(message, store['privateKey'])
-
-# @app.route('/sign')
-# def sign_message():
-#     message = request.args.get('message')
-#     return utils.signMessage(message, store['privateKey'])
+if os.environ.get("REFERENCE_ADDRESS", None) != None:
+    # Action performed by node1.
+    # Make request to node0.
+    # The reqest is the same like in /make_request_to_node_0 endpoint
+    requests.get(url=f"http://172.19.0.2:5000/make_request_to_other_app")
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, threaded=True)
