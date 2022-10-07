@@ -1,6 +1,8 @@
-from nacl.public import PrivateKey, PublicKey, SealedBox
+from nacl.public import PrivateKey, PublicKey, SealedBox, Box
 from nacl.encoding import HexEncoder
+from nacl.signing import SigningKey, VerifyKey
 from nacl.hash import sha256
+from nacl.utils import random
 import socket
 import requests
 import threading
@@ -11,6 +13,7 @@ from CryptoNodeInfo import NodeInfo
 class Node():
     __private_key = None  # TODO symmetrical encryption
     __public_key = None
+    __signing_key = None
 
     pub_list = list[NodeInfo]
     ip = None
@@ -18,7 +21,9 @@ class Node():
     app = None
 
     def __init__(self, network_node_address, app):
-        privateKey = PrivateKey.generate()
+
+        self.__signing_key = SigningKey.generate()
+        privateKey = self.__signing_key.to_curve25519_private_key()
         publicKey = privateKey.public_key
 
         private_encode_key = privateKey.encode(HexEncoder)
@@ -48,7 +53,7 @@ class Node():
     def update_pub_list(self, new_pub_list):
         self.pub_list = new_pub_list
 
-    def getAddressByPublicKey(self, public_key: str):
+    def getAddressByPublicKey(self, public_key: bytes):
         for nodeInfo in self.pub_list:
             if (nodeInfo.public_key == public_key):
                 return nodeInfo.address
@@ -74,9 +79,10 @@ class Node():
             trusted = False
 
         private_key = PrivateKey(self.__private_key, HexEncoder)
-        box = SealedBox(private_key)
-        message = box.decrypt(str.encode(encrypted_object["message"], 'utf8'),
-                              None, HexEncoder).decode("utf8")
+        public_key = PublicKey(sender_public_key, HexEncoder)
+        box = Box(private_key, public_key)
+        message = box.decrypt(str.encode(
+            encrypted_object["message"], 'utf8'), None, HexEncoder).decode("utf8")
 
         self.app.logger.error(f'READ message: {message}')
 
@@ -86,32 +92,20 @@ class Node():
         }
 
     def __sign_message(self, message: bytes, reveiver_public_key: bytes):
-        digest = sha256(message, encoder=HexEncoder)
-
-        # encrypt digest
-        private_key = PrivateKey(self.__private_key, HexEncoder)
-        box = SealedBox(private_key)
-        encrypted_digest = box.decrypt(
-            digest)
-
-        self.app.logger.error(f"encrypted_digest: {encrypted_digest}")
-
         # encrypt message
+        private_key = PrivateKey(self.__private_key, HexEncoder)
         public_key = PublicKey(reveiver_public_key, HexEncoder)
-        box = SealedBox(public_key)
-        encrypted_message = box.encrypt(
-            message)
+        box = Box(private_key, public_key)
+        encrypted_message = box.encrypt(message, encoder=HexEncoder)
 
         return {
             "message": encrypted_message.decode("utf8"),
-            "hash": digest.decode("utf8"),
-            "signed_hash": encrypted_digest.decode("utf8")
         }
 
-    def __verifyMessage(self, received_object, sender_public_key: bytes):
-        expected_digest = str.encode(received_object["hash"], 'utf8')
-        digest_to_decrypt = str.encode(
-            received_object["signed_hash"], 'utf8')
+    def __verifyMessage(self, received_object, sender_verify_key: bytes):
+        return True
+        verify_key_bytes = str.encode(received_object["hash"], 'utf8')
+        verify_key = VerifyKey(sender_verify_key)
 
         # encrypt digest
         public_key = PublicKey(sender_public_key, HexEncoder)

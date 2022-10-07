@@ -11,6 +11,8 @@ app = Flask(__name__)
 node = Node(os.environ.get("REFERENCE_ADDRESS", None), app)
 print(node.pub_list)
 
+app.node = node
+
 
 @app.route('/')
 def hello_geek():
@@ -30,11 +32,6 @@ def get_public_key():
     return {
         'public_key': node.get_public_key().decode('utf8')
     }
-
-
-@app.route('/node', methods=['POST'])
-def get_node():
-    return store['publicKey']
 
 
 def serialize_updated_nodes(node):

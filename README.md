@@ -1,4 +1,10 @@
-# Real shit coin
+# Simple Coin
+
+### Autorzy:
+
+- Jan Łukomski
+
+- Adrian Bączek
 
 ## Stack technologiczny
 
@@ -14,15 +20,26 @@ docker-compose up --build
 
 ## Dodanie kolejnego węzła
 
-Przygotowany jest niewielki skrypt pozwalający uruchomić kolejny węzeł w tej samej sieci w której znajduje się węzeł 0.
+Należy uruchomić docker z podaną nazwą sieci do której chcemy się podłączyć oraz adresem węzła pod który chcemy się podłączyć.
+Nazwa sieci oraz obrazu została ustawiona na podstawie docker-compose'a, więc nie należy jej zmieniać. Adres referencyjny należy wybrać z listy dostępnych węzłów.
+Przykładowe uruchomienie kolejnego węzła:
 
 ```
-bash scripts/addNode
+docker run --env REFERENCE_ADDRESS=192.19.0.2:5000 --network scnetwork simplecoin_node0
 ```
 
 ## Endpointy każdego węzła
 
 GET /nodes - Pozwala pobrać bazę dostępnych węzłów.
-POST /nodes - Pozwala dodać nowy węzeł
+
+POST /connect-node - Pozwala dodać nowy węzeł
+
 GET /publicKey - Pozwala pobrać klucz publiczny
-GET /sign?message=foo - Pozwala wygenerować hash przy użyciu klucza prywatnego do wiadomości
+
+POST /update-pub-list - Pozwala zaktualizować listę dostępnych węzłów
+
+POST /message - Pozwala odebrać wiadomość od innego węzła
+
+--
+
+POST /message:invoke?message={message}&address={destination_address} - Pozwala zainicjować wysłanie wiadomości do innego węzła
