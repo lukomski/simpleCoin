@@ -30,7 +30,7 @@ def get_nodes():
 @app.route('/publicKey')
 def get_public_key():
     return {
-        'public_key': node.get_public_key().decode('utf8')
+        'public_key': node.get_public_key()
     }
 
 
@@ -73,7 +73,7 @@ def connect_node():
 
             updated_connections = serialize_updated_nodes(node)
             for nodeInfo in node.pub_list:
-                if nodeInfo.public_key == node.get_public_key():
+                if nodeInfo.public_key_hex == node.get_public_key():
                     continue
                 try:
                     requests.post(
@@ -88,8 +88,7 @@ def connect_node():
     # node responds, but it has other public key
     pubkey_response_obj = pubkey_response.json()
 
-    new_node_info = NodeInfo(request_addr, str.encode(
-        pubkey_response_obj['public_key'], 'utf8'))
+    new_node_info = NodeInfo(request_addr, pubkey_response_obj['public_key'])
     # node found and it needs to be updated
     if node_idx != -1:
         updated_nodes = [*node.pub_list]
@@ -109,7 +108,7 @@ def connect_node():
     app.logger.error(f"updated_connections: {updated_connections}")
 
     for nodeInfo in node.pub_list:
-        if nodeInfo.public_key == node.get_public_key():
+        if nodeInfo.public_key_hex == node.get_public_key():
             continue
         try:
             requests.post(
@@ -135,7 +134,7 @@ def update_pub_list():
         # rewrite existing (and valid) connections
         should_skip = False
         for nodeInfo in node.pub_list:
-            if (nodeInfo.address == connection['address'] and nodeInfo.public_key.decode("utf8") == connection['public_key']):
+            if (nodeInfo.address == connection['address'] and nodeInfo.public_key_hex == connection['public_key']):
                 update_nodes.append(nodeInfo)
                 should_skip = True
                 break
@@ -151,10 +150,9 @@ def update_pub_list():
                 ip_found_idx = i
                 break
 
-        nodeInfo = NodeInfo(connection['address'], str.encode(
-            connection['public_key'], 'utf8'))
+        nodeInfo = NodeInfo(connection['address'], connection['public_key'])
         # need to update public_key for specific ip address
-        if ip_found_idx != -1 and node.pub_list[ip_found_idx].public_key.encode('utf8') != connection['public_key']:
+        if ip_found_idx != -1 and node.pub_list[ip_found_idx].public_key_hex != connection['public_key']:
             update_nodes.append(nodeInfo)
             continue
 
@@ -185,31 +183,29 @@ def send_message():
 
     object = request.get_json()
 
-    message = str.encode(object["message"], 'utf8')
-
+    message = object["message"]
     address = object["address"]
-    sender_pkey = node.getPublicKeyByAddress(address)
-    if sender_pkey == None:
+
+    sender_pkey_hex = node.getPublicKeyByAddress(address)
+    if sender_pkey_hex == None:
         return {
             "message": "Nie ma takiego adresu w bazie",
             "address": address
 
         }
-    app.logger.error('sender_pkey:' + str(sender_pkey))
-    node.send_message(message, sender_pkey)
+    node.send_message(message, sender_pkey_hex)
     return "ok"
 
 
-@ app.route("/message", methods=["POST"])
+@app.route("/message", methods=["POST"])
 def read_message():
     request_addr = f"{request.remote_addr}:5000"
     object = request.get_json()
 
-    sender_pkey = node.getPublicKeyByAddress(request_addr)
-    object = node.read_message(object, sender_pkey)
-    return {
-        "trusted": object["trusted"]
-    }, 200 if object["trusted"] else 400
+    sender_pkey_hex = node.getPublicKeyByAddress(request_addr)
+
+    object = node.read_message(object, sender_pkey_hex)
+    return "ok"
 
 
 if __name__ == "__main__":

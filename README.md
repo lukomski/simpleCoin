@@ -43,3 +43,17 @@ POST /message - Pozwala odebrać wiadomość od innego węzła
 --
 
 POST /message:invoke?message={message}&address={destination_address} - Pozwala zainicjować wysłanie wiadomości do innego węzła
+
+# Widomości
+
+Wiadomości wysyłane pomiędzy węzłami składają się pola 'payload' oraz 'hash'. Treść wiadomości jest jawna.
+
+```V
+{
+    payload: {
+        type: 'message',
+        message: <MESSAGE>,
+    },
+    hash: <HASH>,
+}
+```
