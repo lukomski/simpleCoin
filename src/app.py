@@ -184,16 +184,15 @@ def send_message():
     object = request.get_json()
 
     message = object["message"]
-    address = object["address"]
 
-    sender_pkey_hex = node.getPublicKeyByAddress(address)
-    if sender_pkey_hex == None:
+    receiver_pkey_hex = object["public_key"]
+    if receiver_pkey_hex == None:
         return {
-            "message": "Nie ma takiego adresu w bazie",
-            "address": address
+            "message": "Nie ma takiego klucza publicznego w bazie",
+            "address": receiver_pkey_hex
 
         }
-    node.send_message(message, sender_pkey_hex)
+    node.send_message(message, receiver_pkey_hex)
     return "ok"
 
 

@@ -62,13 +62,13 @@ class Node():
                 return nodeInfo.public_key_hex
         return None
 
-    def send_message(self, message: str, reveiver_public_key_hex: str):
+    def send_message(self, message: str, receiver_public_key_hex: str):
         payload = {
             'type': 'message',
             'message': message
         }
         frame = self.__message_utils.wrapMessage(payload)
-        address = self.getAddressByPublicKey(reveiver_public_key_hex)
+        address = self.getAddressByPublicKey(receiver_public_key_hex)
         requests.post(
             url=f"http://{address}/message", json=frame)
 
