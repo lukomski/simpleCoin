@@ -9,7 +9,7 @@ class MessageUtils:
         self.__secret_key = secret_key
         pass
 
-    def wrapMessage(self, payload: dict):
+    def wrap_message(self, payload: dict):
         payload_bytes = json.dumps(payload).encode('utf-8')
         signature = self.__secret_key.sign(payload_bytes).signature.hex()
         return {
@@ -17,7 +17,7 @@ class MessageUtils:
             'signature': signature
         }
 
-    def verifyMessage(self, frame: dict, sender_pk_bytes):
+    def verify_message(self, frame: dict, sender_pk_bytes):
         payload = frame['payload']
         payload_bytes = json.dumps(payload).encode('utf-8')
         signature = bytes.fromhex(frame['signature'])

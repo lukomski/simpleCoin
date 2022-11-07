@@ -48,12 +48,33 @@ POST /message:invoke?message={message}&address={destination_address} - Pozwala z
 
 Wiadomości wysyłane pomiędzy węzłami składają się pola 'payload' oraz 'hash'. Treść wiadomości jest jawna.
 
-```V
+```
 {
     payload: {
         type: 'message',
         message: <MESSAGE>,
     },
-    hash: <HASH>,
+    signature: <SIGNATURE>,
+}
+```
+
+Wysyłane bloki są wysyłane w postaci:
+
+```
+{
+    payload: {
+        type: 'add_block',
+        block: {
+            header: {
+                prev_hash: <PREV_HASH>,
+                nonce: <NONCE>,
+                miner: <PUBLIC KEY OF THE MINER>,
+                body_hash: <BODY HASH>
+            },
+            body: <BODY>
+            riddle_result: <RIDDLE RESULT>
+        }
+    },
+    signature: <SIGNATURE>,
 }
 ```

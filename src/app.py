@@ -23,8 +23,16 @@ def hello_geek():
 def get_nodes():
     pub_list = []
     for nodeInfo in node.pub_list:
-        pub_list.append(nodeInfo.toJSON())
+        pub_list.append(nodeInfo.to_JSON())
     return pub_list
+
+
+@app.route('/blocks')
+def get_blocks():
+    blocks = []
+    for block in node.blocks:
+        blocks.append(block.to_JSON())
+    return blocks
 
 
 @app.route('/publicKey')
@@ -38,7 +46,7 @@ def serialize_updated_nodes(node):
     updated_connections = []
     for nodeInfo in node.pub_list:
         updated_connections.append(
-            nodeInfo.toJSON()
+            nodeInfo.to_JSON()
         )
 
     return updated_connections
@@ -103,7 +111,7 @@ def connect_node():
 
     updated_connections = []
     for nodeInfo in node.pub_list:
-        updated_connections.append(nodeInfo.toJSON())
+        updated_connections.append(nodeInfo.to_JSON())
 
     app.logger.error(f"updated_connections: {updated_connections}")
 
@@ -196,12 +204,19 @@ def send_message():
     return "ok"
 
 
+@app.route('/block:invoke', methods=['POST'])
+def create_new_block():
+    data = request.get_json()
+    node.create_block(data)
+    return "ok"
+
+
 @app.route("/message", methods=["POST"])
 def read_message():
     request_addr = f"{request.remote_addr}:5000"
     object = request.get_json()
 
-    sender_pkey_hex = node.getPublicKeyByAddress(request_addr)
+    sender_pkey_hex = node.get_public_key_by_address(request_addr)
 
     object = node.read_message(object, sender_pkey_hex)
     return "ok"

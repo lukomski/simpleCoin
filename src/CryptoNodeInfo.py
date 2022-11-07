@@ -7,7 +7,7 @@ class NodeInfo:
         self.address = address
         self.public_key_hex = public_key_hex
 
-    def toJSON(self):
+    def to_JSON(self):
         return {
             "address": self.address,
             "public_key": self.public_key_hex
