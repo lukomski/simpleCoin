@@ -1,5 +1,4 @@
 import hashlib
-import uuid
 import json
 
 max_nonce = 2 ** 32  # 4 billion
@@ -19,12 +18,11 @@ class Block:
         candidate_block.body = body
         candidate_block.header = {
             'prev_hash': prev_hash_hex,
-            'nonce': uuid.uuid4().hex,
             'miner': miner_pub_key_hex,
             'body_hash': candidate_block.get_body_hash(),
         }
-        candidate_block.riddle_result = candidate_block.__proof_of_work(
-            candidate_block.header)
+        nonce = candidate_block.__proof_of_work(candidate_block.get_POW_data())
+        candidate_block.set_nonce(nonce)
         return candidate_block
 
     @staticmethod
@@ -33,14 +31,16 @@ class Block:
         candidate_block.set_header(
             {
                 'prev_hash': candidate_block_object['header']['prev_hash'],
-                'nonce': candidate_block_object['header']['nonce'],
                 'miner': candidate_block_object['header']['miner'],
                 'body_hash': candidate_block_object['header']['body_hash'],
             })
+        candidate_block.set_nonce(candidate_block_object['header']['nonce'])
         candidate_block.set_body(candidate_block_object['body'])
-        candidate_block.set_riddle_result(
-            candidate_block_object['riddle_result'])
+
         return candidate_block
+
+    def set_nonce(self, nonce):
+        self.header['nonce'] = nonce
 
     def set_header(self, header: dict):
         self.header = header
@@ -48,40 +48,43 @@ class Block:
     def set_body(self, body: dict):
         self.body = body
 
-    def set_riddle_result(self, riddle_result: dict):
-        self.riddle_result = riddle_result
+    def get_POW_data(self):
+        return {
+            'prev_hash': self.header['prev_hash'],
+            'miner': self.header['miner'],
+            'body_hash': self.header['body_hash'],
+        }
 
     def get_body_hash(self):
         body_bytes = json.dumps(self.body).encode('utf-8')
         body_hash = hashlib.sha256(body_bytes).hexdigest()
         return body_hash
 
-    def __proof_of_work(self, header: dict):
+    def __proof_of_work(self, data):
         # calculate the difficulty target
         for nonce in range(max_nonce):
-            if self.__verify_riddle(nonce, header):
+            if self.__verify_nonce(nonce, data):
                 print(f"Success with nonce {nonce}")
                 return nonce
         print(f'Failed after {nonce} tries')
         return nonce
 
-    def __verify_riddle(self, result, header):
-        hash_result = hashlib.sha256(str(header).encode(
-            'utf-8') + str(result).encode('utf-8')).hexdigest()
+    def __verify_nonce(self, nonce, pow_data):
+        hash_result = hashlib.sha256(str(pow_data).encode(
+            'utf-8') + str(nonce).encode('utf-8')).hexdigest()
         return True if int(hash_result, 16) < target else False
 
     def verify(self):
         # check body hash
         if self.header['body_hash'] != self.get_body_hash():
             return False
-        # check riddle
-        return self.__verify_riddle(self.riddle_result, self.header)
+        # check nonce
+        return self.__verify_nonce(self.header['nonce'], self.get_POW_data())
 
     def to_JSON(self):
         return {
             'header': self.header,
             'body': self.body,
-            'riddle_result': self.riddle_result
         }
 
     def get_hash(self):

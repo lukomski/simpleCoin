@@ -72,9 +72,10 @@ Wysyłane bloki są wysyłane w postaci:
                 body_hash: <BODY HASH>
             },
             body: <BODY>
-            riddle_result: <RIDDLE RESULT>
         }
     },
     signature: <SIGNATURE>,
 }
 ```
+
+Pole 'nonce' jest liczone przy pomocy algorytmu POW ze wszystkich pól nagłówka poza 'nonce'.
