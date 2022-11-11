@@ -30,19 +30,29 @@ docker run --env REFERENCE_ADDRESS=192.19.0.2:5000 --network scnetwork simplecoi
 
 ## Endpointy każdego węzła
 
-GET /nodes - Pozwala pobrać bazę dostępnych węzłów.
+GET /blocks - Pozwala pobrać listę bloków w sieci
+
+GET /nodes - Pozwala pobrać bazę dostępnych węzłów
 
 POST /connect-node - Pozwala dodać nowy węzeł
 
-GET /publicKey - Pozwala pobrać klucz publiczny
+GET /public-key - Pozwala pobrać klucz publiczny
 
 POST /update-pub-list - Pozwala zaktualizować listę dostępnych węzłów
 
 POST /message - Pozwala odebrać wiadomość od innego węzła
 
---
+---
 
-POST /message:invoke?message={message}&address={destination_address} - Pozwala zainicjować wysłanie wiadomości do innego węzła
+POST /message:invoke?message={message}&public_key={public_key} - Pozwala zainicjować wysłanie wiadomości do innego węzła
+
+POST /block:invoke - Pozwala zainicjować dodanie bloku do sieci z zawartością podaną w ciele zapytania
+
+---
+
+### Postman
+
+Dostępna jest kolekcja dla postmana znajdująca się w [postman.json](postman.json)
 
 # Widomości
 
@@ -69,7 +79,6 @@ Wysyłane bloki są wysyłane w postaci:
                 prev_hash: <PREV_HASH>,
                 nonce: <NONCE>,
                 miner: <PUBLIC KEY OF THE MINER>,
-                body_hash: <BODY HASH>
             },
             body: <BODY>
         }
@@ -77,5 +86,3 @@ Wysyłane bloki są wysyłane w postaci:
     signature: <SIGNATURE>,
 }
 ```
-
-Pole 'nonce' jest liczone przy pomocy algorytmu POW ze wszystkich pól nagłówka poza 'nonce'.

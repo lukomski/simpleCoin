@@ -1,0 +1,85 @@
+{
+	"info": {
+		"_postman_id": "88e704ca-8025-4894-9740-c25ac1d65ee3",
+		"name": "SimpleCoin",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "9378955"
+	},
+	"item": [
+		{
+			"name": "send message",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"message\": \"Hi dude\",\n    \"public_key\": \"bd11dcc57da38c5b8d17035ca958ff122f2ccfdf3a6e9f49d81b0bc68c2d8610\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:5000/message:invoke",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"message:invoke"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "create block",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"message\": \"Some transaction message\",\n    \"amount\": 0.000425,\n    \"source_coinbase\": \"source_coinbase\",\n    \"destination_coinbase\": \"destination_coinbase\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:5000/block:invoke",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"block:invoke"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "get blocks",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:5001/blocks",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5001",
+					"path": [
+						"blocks"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

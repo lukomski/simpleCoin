@@ -35,7 +35,7 @@ def get_blocks():
     return blocks
 
 
-@app.route('/publicKey')
+@app.route('/public-key')
 def get_public_key():
     return {
         'public_key': node.get_public_key()
@@ -66,7 +66,7 @@ def connect_node():
     pubkey_response = None
     try:
         pubkey_response = requests.get(
-            url="http://" + request_addr + "/publicKey")
+            url="http://" + request_addr + "/public-key")
     except Exception:
         pubkey_response = None
 
@@ -172,7 +172,7 @@ def update_pub_list():
     for i in range(0, len(update_nodes)):
         try:
             requests.get(url="http://" +
-                         update_nodes[i].address + "/publicKey")
+                         update_nodes[i].address + "/public-key")
         except Exception:
             indices_to_remove.append(i)
 
