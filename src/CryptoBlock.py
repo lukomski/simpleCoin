@@ -162,21 +162,28 @@ class Block:
         return self._header['prev_block_hash']
 
     def verify_block(self):
+        '''
+        Verifies block consistency that is:
+        1) Check if nonce placed in header solves proof of work
+        2) Check if hash_prev_nonce value is valid - h(prev. hash + nonce)
+
+        :returns: True if block is correct, otherwise False
+        '''
         # check if nonce value solves proof of work
         is_valid = self.__verify_nonce(self._header['nonce'])
-        if not is_valid:
-            pow_obj = self.get_pow_data()
-            # find hash value for header
-            hash_result = hashlib.sha256(str(pow_obj).encode('utf-8') +
-                                         str(self._header['nonce']).encode('utf-8')).hexdigest()
-            raise ValueError(f"hash_result = {hash_result}")
+        # if not is_valid:
+        #    pow_obj = self.get_pow_data()
+        #    find hash value for header
+        #    hash_result = hashlib.sha256(str(pow_obj).encode('utf-8') +
+        #                              str(self._header['nonce']).encode('utf-8')).hexdigest()
+        #    raise ValueError(f"hash_result = {hash_result}")
+        
         # check if calculated h(prev. block hash + nonce) matches value placed in header
         prev_block_nonce_hash_calculated = self.__calculate_hash_prev_block_nonce()
         prev_block_nonce_hash = self._header['hash_prev_nonce']
 
         # final verification
-        valid_block = is_valid and (
-            prev_block_nonce_hash == prev_block_nonce_hash_calculated)
+        valid_block = is_valid and (prev_block_nonce_hash == prev_block_nonce_hash_calculated)
         return valid_block
 
     def to_json(self):
