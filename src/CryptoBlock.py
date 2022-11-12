@@ -151,11 +151,11 @@ class Block:
 
     def get_pow_data(self):
         return {
+            'data': dict(sorted(self._data.items())),
             'header': {
-                'prev_block_hash': self.get_prev_hash(),
                 'miner_pub_key': self._header['miner_pub_key'],
-            },
-            'data': dict(sorted(self._data.items()))
+                'prev_block_hash': self.get_prev_hash(),
+            }
         }
 
     def get_prev_hash(self):
@@ -177,13 +177,14 @@ class Block:
         #    hash_result = hashlib.sha256(str(pow_obj).encode('utf-8') +
         #                              str(self._header['nonce']).encode('utf-8')).hexdigest()
         #    raise ValueError(f"hash_result = {hash_result}")
-        
+
         # check if calculated h(prev. block hash + nonce) matches value placed in header
         prev_block_nonce_hash_calculated = self.__calculate_hash_prev_block_nonce()
         prev_block_nonce_hash = self._header['hash_prev_nonce']
 
         # final verification
-        valid_block = is_valid and (prev_block_nonce_hash == prev_block_nonce_hash_calculated)
+        valid_block = is_valid and (
+            prev_block_nonce_hash == prev_block_nonce_hash_calculated)
         return valid_block
 
     def to_json(self):
@@ -194,12 +195,8 @@ class Block:
         '''
         # restore block object as dictionary
         block_object = {
-            'header': {
-                **self._header
-            },
-            'data': {
-                **self._data
-            }
+            'data': dict(sorted({**self._data}.items())),
+            'header': dict(sorted({**self._header}.items()))
         }
         return block_object
 

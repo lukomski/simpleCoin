@@ -54,7 +54,7 @@ POST /block:invoke - Pozwala zainicjować dodanie bloku do sieci z zawartością
 
 Dostępna jest kolekcja dla postmana znajdująca się w [postman.json](postman.json)
 
-# Widomości
+# Wiadomości
 
 Wiadomości wysyłane pomiędzy węzłami składają się pola 'payload' oraz 'hash'. Treść wiadomości jest jawna.
 
@@ -76,13 +76,36 @@ Wysyłane bloki są wysyłane w postaci:
         type: 'add_block',
         block: {
             header: {
-                prev_hash: <PREV_HASH>,
+                prev_block_hash: <PREV_HASH>,
                 nonce: <NONCE>,
-                miner: <PUBLIC KEY OF THE MINER>,
+                hash_prev_nonce: <HASH OF COMBINED 'nonce' AND 'prev_block_hash' VALUES>
+                miner_pub_key: <PUBLIC KEY OF THE MINER>,
             },
-            body: <BODY>
+            data: <DATA>
         }
     },
     signature: <SIGNATURE>,
 }
+```
+
+# Pliki z wydobytymi blokami
+
+Pliki zapisywana są na maszynach węzłów. Podejrzeć plik można przy użyciu poniższego polecenia
+
+```
+docker exec -it sc_node0 cat blockchain.json
+```
+
+Aby usunąć plik należy wykonać polecenie:
+
+```
+docker exec -it sc_node0 rm blockchain.json
+```
+
+W celu ręcznej edycji pliku blockchaina (np w celu sprawdzenia czy weryfikowana jest poprawność łańcucha) należy wykonać poniższe polecenia
+
+```
+docker exec -it sc_node0 bash
+apt update && apt install -y vim
+vim blockchain.json
 ```

@@ -1,6 +1,8 @@
 from CryptoBlock import Block
-import hashlib
 import json
+
+FILE_NAME = "blockchain.json"
+
 
 class BlockChain:
     _blocks: list[Block] = None
@@ -13,7 +15,7 @@ class BlockChain:
         :type  generic_block: Block
         '''
         self._blocks = [generic_block]
-        self.save("blockchain.json")
+        self.save(FILE_NAME)
 
     def add_block(self, new_block: Block):
         last_block = self._blocks[-1]
@@ -22,15 +24,15 @@ class BlockChain:
         prev_hash = new_block.get_prev_hash()
 
         if prev_block_hash != prev_hash:
-            raise ValueError("Inconsistency found in provided blockchain - " +
-                             "Invalid blockchain, try again with another.")
+            raise ValueError(
+                f"Invalid previus block hash")
 
         block_valid = new_block.verify_block()
         if not block_valid:
             raise ValueError("Invalid block")
 
         self._blocks.append(new_block)
-        self.save("blockchain.json")
+        self.save(FILE_NAME)
 
     def add_block_from_data(self, data: dict, miner_pub_key: str):
         block = Block.create(
@@ -42,18 +44,18 @@ class BlockChain:
         for block in self._blocks:
             blocks.append(block.to_json())
         return blocks
-    
+
     def validate(self):
         '''
         Validates whether blockchain is consistent or not.
 
         :returns: True if blockchain is valid, otherwise False.
         '''
-        if len(self._blocks) == 1: # single block in blockchain
+        if len(self._blocks) == 1:  # single block in blockchain
             # just verify single block, there's no need to check with other block
             is_valid = self._blocks[0].verify_block()
             return is_valid
-        else: # more than one block in blockchain
+        else:  # more than one block in blockchain
             for i in range(1, len(self._blocks)):
                 # check if previous block hash is assigned properly to next block
                 prev_block_hash = self._blocks[i - 1].get_block_hash()
@@ -98,7 +100,8 @@ class BlockChain:
             try:
                 blockchain.add_block(blockchain_list[i])
             except ValueError as err:
-                raise err
+                raise ValueError(
+                    f'Error for index {i} of the chain: {str(err)}')
             print("Block added successfully")
 
         return blockchain
@@ -111,7 +114,7 @@ class BlockChain:
         :throws:\n
         ValueError - could not restore blockchain.\n
         FileNotFoundError - could not find specified file with blockchain.
-        
+
         :returns: Restored from file blockchain.
         '''
         try:
@@ -121,12 +124,9 @@ class BlockChain:
 
                 blocks = Block.load_list(parsed_blockchain)
                 blockchain = BlockChain.create_blockchain(blocks)
-                
+
                 return blockchain
         except FileNotFoundError:
             return None
         except ValueError:
             return None
-
-                
-
