@@ -7,7 +7,7 @@ import threading
 from CryptoNodeInfo import NodeInfo
 from CryptoMessageUtils import MessageUtils
 from CryptoBlock import Block
-import uuid
+from CryptoBlockchain import BlockChain
 
 
 class Node():
@@ -18,7 +18,7 @@ class Node():
     __public_key_hex = None
 
     pub_list = list[NodeInfo]
-    blocks = list[Block]
+    blockchain: BlockChain = None
     ip = None
     port = None
     app = None
@@ -33,7 +33,6 @@ class Node():
         self.__message_utils = MessageUtils(self.__private_key)
         if network_node_address is not None:
             self.pub_list = []
-            self.blocks = []
 
             def f():
                 self.app.logger.info("Sending request to connect new node")
@@ -44,21 +43,22 @@ class Node():
 
             block_list = requests.get(
                 url=f'http://{network_node_address}/blocks').json()
-            for block_dict in block_list:
-                self.blocks.append(Block.load(block_dict))
+
+            block_list = Block.load_list(block_list)
+            self.blockchain = BlockChain.create_blockchain(block_list)
 
         else:
             self.pub_list = [
                 NodeInfo(f"{socket.gethostbyname(socket.gethostname())}:5000",
                          self.__public_key_hex)
             ]
-            initial_prev_hash_hex = uuid.uuid4().hex
+            initial_prev_hash_hex = None  # uuid.uuid4().hex
             body = {
                 'message': 'Initial block',
             }
             block = Block.create(initial_prev_hash_hex,
                                  body, self.__public_key_hex)
-            self.blocks = [block]
+            self.blockchain = BlockChain.create_blockchain([block])
 
     def get_public_key(self):
         return self.__public_key_hex
@@ -103,36 +103,21 @@ class Node():
             }
         elif payload['type'] == 'new_block':
             block = Block.load(payload['block'])
-            self.app.logger.error(f'READ block: {block.to_JSON()}')
-            if not block.verify():
-                self.app.logger.error(f'Incorect block verification')
-                return {
-                    "verified": 'incorrect',
-                    "block": payload['block']
-                }
-            # verify prev hash
-            last_block_hash = self.blocks[-1].get_hash()
-            if block.get_prev_hash() != last_block_hash:
-                self.app.logger.error(f'Incorect block prev hash')
-                self.app.logger.error(f'Found {block.get_prev_hash()}')
-                self.app.logger.error(f'Expected {last_block_hash}')
-                return {
-                    "verified": 'incorrect',
-                    "block": payload['block'],
-                    "message": 'Incorrect prev hash'
-                }
-            self.blocks.append(block)
+            try:
+                self.blockchain.add_block(block)
+            except ValueError as err:
+                raise err
         else:
             return 'Unhandled message type'
 
     def create_block(self, data):
-        prev_hash_hex = self.blocks[-1].get_hash()
-        block = Block.create(prev_hash_hex, data, self.get_public_key())
-        self.blocks.append(block)
+        new_block = self.blockchain._blocks[-1].create_next_block(
+            data, self.get_public_key())
+
         # spread
         payload = {
             'type': 'new_block',
-            'block': block.to_JSON()
+            'block': new_block.to_json()
         }
         frame = self.__message_utils.wrap_message(payload)
         for node in self.pub_list:

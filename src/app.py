@@ -29,10 +29,7 @@ def get_nodes():
 
 @app.route('/blocks')
 def get_blocks():
-    blocks = []
-    for block in node.blocks:
-        blocks.append(block.to_JSON())
-    return blocks
+    return node.blockchain.to_json()
 
 
 @app.route('/public-key')
@@ -221,6 +218,9 @@ def read_message():
     object = node.read_message(object, sender_pkey_hex)
     return "ok"
 
+@app.route("/last-block-hash", methods=["GET"])
+def last_block_hash():
+    return node.blockchain._blocks[-1].get_block_hash()
 
 if __name__ == "__main__":
     app.run(debug=True)

@@ -41,7 +41,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"message\": \"Some transaction message\",\n    \"amount\": 0.000425,\n    \"source_coinbase\": \"source_coinbase\",\n    \"destination_coinbase\": \"destination_coinbase\"\n}",
+					"raw": "{\n    \"amount\": 0.000425,\n    \"message\": \"Some transaction message\",\n    \"destination_coinbase\": \"destination_coinbase\",\n    \"source_coinbase\": \"source_coinbase\"\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -68,12 +68,12 @@
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "http://localhost:5001/blocks",
+					"raw": "http://localhost:5000/blocks",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
-					"port": "5001",
+					"port": "5000",
 					"path": [
 						"blocks"
 					]
@@ -87,12 +87,12 @@
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "http://localhost:5001/nodes",
+					"raw": "http://localhost:5000/nodes",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
-					"port": "5001",
+					"port": "5000",
 					"path": [
 						"nodes"
 					]
