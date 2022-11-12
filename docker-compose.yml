@@ -9,7 +9,7 @@ services:
       - ./src:/app
     networks:
       - scnetwork
-    command: python3 -m flask run --host=0.0.0.0
+    command: python3 -m flask --debug run --host=0.0.0.0
 networks:
   scnetwork:
     name: scnetwork
