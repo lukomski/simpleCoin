@@ -119,7 +119,9 @@ class BlockChain:
                 file_content = f.read()
                 parsed_blockchain = json.loads(file_content)
 
-                blockchain = BlockChain.create_blockchain(parsed_blockchain)
+                blocks = Block.load_list(parsed_blockchain)
+                blockchain = BlockChain.create_blockchain(blocks)
+                
                 return blockchain
         except FileNotFoundError:
             return None

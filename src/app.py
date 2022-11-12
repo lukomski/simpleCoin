@@ -222,5 +222,12 @@ def read_message():
 def last_block_hash():
     return node.blockchain._blocks[-1].get_block_hash()
 
+@app.route("/validate", methods=["GET"])
+def validate_blockchain():
+    is_valid = node.blockchain.validate()
+    return {
+        "is_valid": str(is_valid)
+    }
+
 if __name__ == "__main__":
     app.run(debug=True)

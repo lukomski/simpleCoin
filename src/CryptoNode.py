@@ -8,7 +8,9 @@ from CryptoNodeInfo import NodeInfo
 from CryptoMessageUtils import MessageUtils
 from CryptoBlock import Block
 from CryptoBlockchain import BlockChain
+import os
 
+blockchain_filepath = "blockchain.json"
 
 class Node():
     __private_key = None
@@ -58,7 +60,13 @@ class Node():
             }
             block = Block.create(initial_prev_hash_hex,
                                  body, self.__public_key_hex)
-            self.blockchain = BlockChain.create_blockchain([block])
+            
+            if os.path.exists(blockchain_filepath):
+                self.blockchain = BlockChain.load_blockchain(blockchain_filepath)
+                if self.blockchain is None:
+                    raise ValueError("Could not load/parse existing blockchain - remove file or correct it to start node.")
+            else:
+                self.blockchain = BlockChain.create_blockchain([block])
 
     def get_public_key(self):
         return self.__public_key_hex
