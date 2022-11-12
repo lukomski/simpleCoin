@@ -2,7 +2,7 @@ import hashlib
 import json
 
 max_nonce = 2 ** 32  # 4 billion
-difficulty_bits = 10  # 0 to 24 bits
+difficulty_bits = 23  # 0 to 24 bits
 target = 2 ** (256-difficulty_bits)
 
 
