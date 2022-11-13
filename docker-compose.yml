@@ -10,6 +10,11 @@ services:
     networks:
       - scnetwork
     command: python3 -m flask run --host=0.0.0.0
+    environment:
+      # Generate using:
+      # import nacl.secret
+      # nacl.utils.random(nacl.secret.SecretBox.KEY_SIZE).hex()
+      - SECRET_KEY=07f83cd2a279a2edc6b7ae1ced2cef4d325490efb2d2194813d7b446155d0c64
 networks:
   scnetwork:
     name: scnetwork

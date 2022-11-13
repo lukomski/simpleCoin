@@ -10,13 +10,17 @@ from CryptoBlock import Block
 from CryptoBlockchain import BlockChain
 import os
 from CryptoTransactionPool import TransactionPool, Transaction
-from CryptoUtils import get_order_directory_recursively
+from CryptoUtils import get_order_directory_recursively, encrypt_by_secret_key, decrypt_by_secret_key
 import uuid
+import json
 
-blockchain_filepath = "blockchain.json"
+BLOCKCHAIN_FILE_PATH = "blockchain.json"
+
+KEYS_FILE_PATH = 'keys.json'
 
 
 class Node():
+    __secret_key = None
     __private_key = None
     __public_key = None
     __message_utils = None
@@ -42,10 +46,16 @@ class Node():
         for node in self.pub_list:
             requests.post(url=f'http://{node.address}/message', json=frame)
 
-    def __init__(self, network_node_address, app):
+    def __init__(self, network_node_address, secret_key, app):
+        self.__secret_key = secret_key
 
-        self.__private_key = SigningKey.generate()
+        seed = self.get_seed_from_file()
+        if seed is None:
+            self.__private_key = SigningKey.generate()
+        else:
+            self.__private_key = SigningKey(seed)
         self.__public_key = self.__private_key.verify_key
+        self.save_keys()
 
         self.__public_key_hex = self.__public_key.encode().hex()
         self.app = app
@@ -81,9 +91,9 @@ class Node():
             block = Block.create(initial_prev_hash_hex,
                                  body, self.__public_key_hex)
 
-            if os.path.exists(blockchain_filepath):
+            if os.path.exists(BLOCKCHAIN_FILE_PATH):
                 self.blockchain = BlockChain.load_blockchain(
-                    blockchain_filepath)
+                    BLOCKCHAIN_FILE_PATH)
                 if self.blockchain is None:
                     raise ValueError(
                         "Could not load/parse existing blockchain - remove file or correct it to start node.")
@@ -181,3 +191,22 @@ class Node():
     def add_transaction(self, data: dict):
         transaction = Transaction(get_order_directory_recursively(data))
         self.transaction_pool.add_transaction(transaction)
+
+    def save_keys(self):
+        keys_data = {
+            'seed': encrypt_by_secret_key(self.__secret_key, self.__private_key._seed.hex()),
+            'public_key': self.__public_key_hex
+        }
+        with open(KEYS_FILE_PATH, "w") as f:
+            f.write(json.dumps(keys_data))
+
+    def get_seed_from_file(self):
+        try:
+            seed = None
+            with open(KEYS_FILE_PATH, "r") as f:
+                keys_data = f.read()
+                seed = decrypt_by_secret_key(
+                    self.__secret_key, keys_data['seed'])
+            return bytes.fromhex(seed)
+        except Exception:
+            return None

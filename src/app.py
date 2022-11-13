@@ -7,8 +7,12 @@ from CryptoNode import Node
 
 
 app = Flask(__name__)
+reference_address = os.environ.get("REFERENCE_ADDRESS", None)
+secret_key = os.environ.get("SECRET_KEY", None)
+if secret_key == None:
+    raise AssertionError('Need SECRET_KEY defined to store keys in secure way')
 
-node = Node(os.environ.get("REFERENCE_ADDRESS", None), app)
+node = Node(reference_address, secret_key, app)
 print(node.pub_list)
 
 app.node = node

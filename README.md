@@ -42,13 +42,11 @@ POST /update-pub-list - Pozwala zaktualizować listę dostępnych węzłów
 
 POST /message - Pozwala odebrać wiadomość od innego węzła
 
+POST /transaction - Pozwala dodać transakcję do najbliższego bloku
+
 ---
 
 POST /message:invoke?message={message}&public_key={public_key} - Pozwala zainicjować wysłanie wiadomości do innego węzła
-
-POST /block:invoke - Pozwala zainicjować dodanie bloku do sieci z zawartością podaną w ciele zapytania
-
----
 
 ### Postman
 
