@@ -1,4 +1,7 @@
 
+from CryptoUtils import get_order_directory_recursively
+
+
 class Transaction:
     _data: dict = None
 
@@ -6,35 +9,24 @@ class Transaction:
         self._data = data
 
     def to_json(self):
-        data = dict(sorted(self._data.items()))
-        return data
+        return get_order_directory_recursively(self._data)
 
-TR_NUM_TO_CONSUME = 1
 
 class TransactionPool:
     _transactions: list[Transaction] = None
-    _should_start_dig = None
-    _digging = None
 
     def __init__(self):
         self._transactions = []
-        self._should_start_dig = False
-        self._digging = False
 
     def add_transaction(self, transaction: Transaction):
         self._transactions.append(transaction)
-        if len(self._transactions) >= TR_NUM_TO_CONSUME:
-            self._should_start_dig = True
 
-    def should_dig(self):
-        return self._should_start_dig
-    
-    def is_dig_state(self):
-        return self._digging
+    def get_next_transaction_json(self):
+        return self._transactions[-1].to_json() if len(self._transactions) > 0 else None
 
-    def set_dig_state(self, value):
-        self._digging = value
-    
+    def pop_next_transaction(self):
+        return self._transactions.pop()
+
     def to_json(self):
         json_data = {}
         for i in range(len(self._transactions)):

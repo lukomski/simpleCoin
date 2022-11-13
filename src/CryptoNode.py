@@ -10,11 +10,11 @@ from CryptoBlock import Block
 from CryptoBlockchain import BlockChain
 import os
 from CryptoTransactionPool import TransactionPool, Transaction
-
+from CryptoUtils import get_order_directory_recursively
 import uuid
-import time
 
 blockchain_filepath = "blockchain.json"
+
 
 class Node():
     __private_key = None
@@ -50,7 +50,7 @@ class Node():
         self.__public_key_hex = self.__public_key.encode().hex()
         self.app = app
         self.__message_utils = MessageUtils(self.__private_key)
-        
+
         self.transaction_pool = TransactionPool()
         self._processed_transaction_pools = []
 
@@ -80,14 +80,16 @@ class Node():
             }
             block = Block.create(initial_prev_hash_hex,
                                  body, self.__public_key_hex)
-            
+
             if os.path.exists(blockchain_filepath):
-                self.blockchain = BlockChain.load_blockchain(blockchain_filepath)
+                self.blockchain = BlockChain.load_blockchain(
+                    blockchain_filepath)
                 if self.blockchain is None:
-                    raise ValueError("Could not load/parse existing blockchain - remove file or correct it to start node.")
+                    raise ValueError(
+                        "Could not load/parse existing blockchain - remove file or correct it to start node.")
             else:
                 self.blockchain = BlockChain.create_blockchain([block])
-        
+
         dig_time = threading.Timer(1, self.__invoke_infinite_dig)
         dig_time.start()
 
@@ -95,23 +97,16 @@ class Node():
         self.infinite_dig_id = uuid.uuid4()
         uuid_copy = self.infinite_dig_id
         while True:
-            if uuid_copy != self.infinite_dig_id:
-                break
-
-            block_data = {}
-            if self.transaction_pool.should_dig():
-                # if we should dig for new block, calculate block data
-                self.transaction_pool.set_dig_state(True)
-                block_data = self.transaction_pool.to_json()
-                
-                # create transaction pool for new transactions
-                self._processed_transaction_pools.append(self.transaction_pool)
-                self.transaction_pool = TransactionPool()
-            else:
-                pass
+            next_transaction = self.transaction_pool.get_next_transaction_json()
+            block_data = next_transaction if next_transaction else {}
 
             # start digging for new block and after that broadcast result
             self.create_block(block_data)
+
+            if uuid_copy != self.infinite_dig_id:
+                break
+            elif next_transaction:
+                self.transaction_pool.pop_next_transaction()
 
     def get_public_key(self):
         return self.__public_key_hex
@@ -160,7 +155,7 @@ class Node():
                 self.blockchain.add_block(block)
             except ValueError as err:
                 raise err
-            
+
             if sender_pk_hex != self.get_public_key():
                 dig_time = threading.Timer(1, self.__invoke_infinite_dig)
                 dig_time.start()
@@ -182,12 +177,7 @@ class Node():
         frame = self.__message_utils.wrap_message(payload)
         for node in self.pub_list:
             requests.post(url=f'http://{node.address}/message', json=frame)
-    
-    def stash_transaction(self, data: dict):
-        json = {
-            'msg': dict(sorted(data.items())),
-            'signature': ''
-        }
 
-        transaction = Transaction(json)
+    def add_transaction(self, data: dict):
+        transaction = Transaction(get_order_directory_recursively(data))
         self.transaction_pool.add_transaction(transaction)

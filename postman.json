@@ -1,8 +1,9 @@
 {
 	"info": {
-		"_postman_id": "2b824cc0-ec7b-41df-b5ab-dc8c06b0ad72",
+		"_postman_id": "50242c10-7674-4de0-a952-a3a61e301547",
 		"name": "SimpleCoin",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "9378955"
 	},
 	"item": [
 		{
@@ -34,13 +35,13 @@
 			"response": []
 		},
 		{
-			"name": "create block",
+			"name": "add transaction",
 			"request": {
 				"method": "POST",
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"message\": \"Some transaction message\",\n    \"amount\": 0.000425,\n    \"source_coinbase\": \"source_coinbase\",\n    \"destination_coinbase\": \"destination_coinbase\"\n}",
+					"raw": "{\r\n    \"message\": \"Some transaction message\",\r\n    \"amount\": 0.000425,\r\n    \"source_coinbase\": \"source_coinbase\",\r\n    \"destination_coinbase\": \"destination_coinbase\"\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -48,37 +49,14 @@
 					}
 				},
 				"url": {
-					"raw": "http://localhost:5000/block:invoke",
+					"raw": "http://localhost:5000/transaction",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "5000",
 					"path": [
-						"block:invoke"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "stash transactions",
-			"request": {
-				"method": "POST",
-				"header": [],
-				"body": {
-					"mode": "raw",
-					"raw": "{\r\n    \"message\": \"Some transaction message\",\r\n    \"amount\": 0.000425,\r\n    \"source_coinbase\": \"source_coinbase\",\r\n    \"destination_coinbase\": \"destination_coinbase\"\r\n}"
-				},
-				"url": {
-					"raw": "http://localhost:5000/add-transaction",
-					"protocol": "http",
-					"host": [
-						"localhost"
-					],
-					"port": "5000",
-					"path": [
-						"add-transaction"
+						"transaction"
 					]
 				}
 			},
@@ -142,18 +120,21 @@
 			"response": []
 		},
 		{
-			"name": "get last block hash",
-			"request": {
-				"method": "GET",
-				"header": []
-			},
-			"response": []
-		},
-		{
 			"name": "validate blockchain",
 			"request": {
 				"method": "GET",
-				"header": []
+				"header": [],
+				"url": {
+					"raw": "http://localhost:5000/validate",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"validate"
+					]
+				}
 			},
 			"response": []
 		}

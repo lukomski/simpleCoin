@@ -1,7 +1,8 @@
+from CryptoUtils import get_order_directory_recursively
 import hashlib
 
-max_nonce = 2 ** 32  # 4 billion
-difficulty_bits = 23      # 0 to 24 bits
+max_nonce = 2 ** 32     # 4 billion
+difficulty_bits = 20    # 0 to 24 bits
 target = 2 ** (256 - difficulty_bits)
 
 
@@ -50,7 +51,8 @@ class Block:
         candidate_block._nonce = nonce
 
         # calculate hash from prev_block_hash value + nonce to keep consistency in blockchain
-        candidate_block._header['hash_prev_nonce'] = candidate_block.__calculate_hash_prev_block_nonce()
+        candidate_block._header['hash_prev_nonce'] = candidate_block.__calculate_hash_prev_block_nonce(
+        )
         return candidate_block
 
     @staticmethod
@@ -149,13 +151,13 @@ class Block:
         return hash_prev_block_nonce
 
     def get_pow_data(self):
-        return {
-            'data': dict(sorted(self._data.items())),
+        return get_order_directory_recursively({
+            'data': self._data,
             'header': {
                 'miner_pub_key': self._header['miner_pub_key'],
                 'prev_block_hash': self.get_prev_hash(),
             }
-        }
+        })
 
     def get_prev_hash(self):
         return self._header['prev_block_hash']
@@ -193,10 +195,10 @@ class Block:
         :returns: Block dictionary object
         '''
         # restore block object as dictionary
-        block_object = {
-            'data': dict(sorted({**self._data}.items())),
-            'header': dict(sorted({**self._header}.items()))
-        }
+        block_object = get_order_directory_recursively({
+            'data': self._data,
+            'header': self._header
+        })
         return block_object
 
     def create_next_block(self, data: dict, miner_public_key: str):

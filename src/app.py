@@ -201,17 +201,12 @@ def send_message():
     return "ok"
 
 
-@app.route('/block:invoke', methods=['POST'])
-def create_new_block():
-    data = request.get_json()
-    node.create_block(data)
-    return "ok"
-
-@app.route('/add-transaction', methods=['POST'])
+@app.route('/transaction', methods=['POST'])
 def create_next_transaction():
     data = request.get_json()
-    node.stash_transaction(data)
+    node.add_transaction(data)
     return "ok"
+
 
 @app.route("/message", methods=["POST"])
 def read_message():
@@ -223,9 +218,11 @@ def read_message():
     object = node.read_message(object, sender_pkey_hex)
     return "ok"
 
+
 @app.route("/last-block-hash", methods=["GET"])
 def last_block_hash():
     return node.blockchain._blocks[-1].get_block_hash()
+
 
 @app.route("/validate", methods=["GET"])
 def validate_blockchain():
@@ -233,6 +230,7 @@ def validate_blockchain():
     return {
         "is_valid": str(is_valid)
     }
+
 
 if __name__ == "__main__":
     app.run(debug=True)
