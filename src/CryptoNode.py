@@ -9,6 +9,7 @@ from CryptoMessageUtils import MessageUtils
 from CryptoBlock import Block
 from CryptoBlockchain import BlockChain
 import os
+from CryptoTransactionPool import TransactionPool, Transaction
 
 blockchain_filepath = "blockchain.json"
 
@@ -24,6 +25,8 @@ class Node():
     ip = None
     port = None
     app = None
+    transaction_pool = None
+    _processed_transaction_pools = None
 
     def __init__(self, network_node_address, app):
 
@@ -33,6 +36,10 @@ class Node():
         self.__public_key_hex = self.__public_key.encode().hex()
         self.app = app
         self.__message_utils = MessageUtils(self.__private_key)
+        
+        self.transaction_pool = TransactionPool()
+        self._processed_transaction_pools = []
+
         if network_node_address is not None:
             self.pub_list = []
 
@@ -130,3 +137,25 @@ class Node():
         frame = self.__message_utils.wrap_message(payload)
         for node in self.pub_list:
             requests.post(url=f'http://{node.address}/message', json=frame)
+    
+    def stash_transaction(self, data: dict):
+        json = {
+            'msg': dict(sorted(data.items())),
+            'signature': ''
+        }
+
+        transaction = Transaction(json)
+        self.transaction_pool.add_transaction(transaction)
+        # check if we should start dig
+        if self.transaction_pool.should_dig():
+            # if we should dig for new block, calculate block data
+            self.transaction_pool.set_dig_state(True)
+            block_data = self.transaction_pool.to_json()
+            
+            # create transaction pool for new transactions
+            self._processed_transaction_pools.append(self.transaction_pool)
+            self.transaction_pool = TransactionPool()
+
+            # start digging for new block and after that broadcast result
+            self.create_block(block_data)
+            self.blockchain.save()

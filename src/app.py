@@ -207,6 +207,11 @@ def create_new_block():
     node.create_block(data)
     return "ok"
 
+@app.route('/add-transaction', methods=['POST'])
+def create_next_transaction():
+    data = request.get_json()
+    node.stash_transaction(data)
+    return "ok"
 
 @app.route("/message", methods=["POST"])
 def read_message():

@@ -24,8 +24,7 @@ class BlockChain:
         prev_hash = new_block.get_prev_hash()
 
         if prev_block_hash != prev_hash:
-            raise ValueError(
-                f"Invalid previus block hash")
+            raise ValueError(f"Invalid previous block hash")
 
         block_valid = new_block.verify_block()
         if not block_valid:

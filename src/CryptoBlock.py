@@ -50,8 +50,7 @@ class Block:
         candidate_block._nonce = nonce
 
         # calculate hash from prev_block_hash value + nonce to keep consistency in blockchain
-        candidate_block._header['hash_prev_nonce'] = candidate_block.__calculate_hash_prev_block_nonce(
-        )
+        candidate_block._header['hash_prev_nonce'] = candidate_block.__calculate_hash_prev_block_nonce()
         return candidate_block
 
     @staticmethod
