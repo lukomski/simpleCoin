@@ -9,7 +9,7 @@ class Transaction:
         data = dict(sorted(self._data.items()))
         return data
 
-TR_NUM_TO_CONSUME = 5
+TR_NUM_TO_CONSUME = 1
 
 class TransactionPool:
     _transactions: list[Transaction] = None

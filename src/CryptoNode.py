@@ -11,6 +11,9 @@ from CryptoBlockchain import BlockChain
 import os
 from CryptoTransactionPool import TransactionPool, Transaction
 
+import uuid
+import time
+
 blockchain_filepath = "blockchain.json"
 
 class Node():
@@ -27,6 +30,17 @@ class Node():
     app = None
     transaction_pool = None
     _processed_transaction_pools = None
+
+    dig_process = None
+    infinite_dig_id = None
+
+    def __invoke_infinite_dig(self):
+        payload = {
+            'type': 'start-digging',
+        }
+        frame = self.__message_utils.wrap_message(payload)
+        for node in self.pub_list:
+            requests.post(url=f'http://{node.address}/message', json=frame)
 
     def __init__(self, network_node_address, app):
 
@@ -55,7 +69,6 @@ class Node():
 
             block_list = Block.load_list(block_list)
             self.blockchain = BlockChain.create_blockchain(block_list)
-
         else:
             self.pub_list = [
                 NodeInfo(f"{socket.gethostbyname(socket.gethostname())}:5000",
@@ -74,6 +87,31 @@ class Node():
                     raise ValueError("Could not load/parse existing blockchain - remove file or correct it to start node.")
             else:
                 self.blockchain = BlockChain.create_blockchain([block])
+        
+        dig_time = threading.Timer(1, self.__invoke_infinite_dig)
+        dig_time.start()
+
+    def infinite_dig(self):
+        self.infinite_dig_id = uuid.uuid4()
+        uuid_copy = self.infinite_dig_id
+        while True:
+            if uuid_copy != self.infinite_dig_id:
+                break
+
+            block_data = {}
+            if self.transaction_pool.should_dig():
+                # if we should dig for new block, calculate block data
+                self.transaction_pool.set_dig_state(True)
+                block_data = self.transaction_pool.to_json()
+                
+                # create transaction pool for new transactions
+                self._processed_transaction_pools.append(self.transaction_pool)
+                self.transaction_pool = TransactionPool()
+            else:
+                pass
+
+            # start digging for new block and after that broadcast result
+            self.create_block(block_data)
 
     def get_public_key(self):
         return self.__public_key_hex
@@ -122,6 +160,13 @@ class Node():
                 self.blockchain.add_block(block)
             except ValueError as err:
                 raise err
+            
+            if sender_pk_hex != self.get_public_key():
+                dig_time = threading.Timer(1, self.__invoke_infinite_dig)
+                dig_time.start()
+
+        elif payload['type'] == 'start-digging':
+            self.infinite_dig()
         else:
             return 'Unhandled message type'
 
@@ -146,16 +191,3 @@ class Node():
 
         transaction = Transaction(json)
         self.transaction_pool.add_transaction(transaction)
-        # check if we should start dig
-        if self.transaction_pool.should_dig():
-            # if we should dig for new block, calculate block data
-            self.transaction_pool.set_dig_state(True)
-            block_data = self.transaction_pool.to_json()
-            
-            # create transaction pool for new transactions
-            self._processed_transaction_pools.append(self.transaction_pool)
-            self.transaction_pool = TransactionPool()
-
-            # start digging for new block and after that broadcast result
-            self.create_block(block_data)
-            self.blockchain.save()
