@@ -2,30 +2,23 @@ from nacl.signing import SigningKey
 
 import socket
 import requests
-import threading
 
 from CryptoNodeInfo import NodeInfo
 from CryptoMessageUtils import MessageUtils
 from CryptoBlock import Block
 from CryptoBlockchain import BlockChain
+from CryptoKeyManager import KeyManager
+from threading import Thread
 import os
 from CryptoTransactionPool import TransactionPool, Transaction
 from CryptoUtils import get_order_directory_recursively, encrypt_by_secret_key, decrypt_by_secret_key
 import uuid
-import json
 
 BLOCKCHAIN_FILE_PATH = "blockchain.json"
 
-KEYS_FILE_PATH = 'keys.json'
-
 
 class Node():
-    __secret_key = None
-    __private_key = None
-    __public_key = None
     __message_utils = None
-
-    __public_key_hex = None
 
     pub_list = list[NodeInfo]
     blockchain: BlockChain = None
@@ -34,6 +27,7 @@ class Node():
     app = None
     transaction_pool = None
     _processed_transaction_pools = None
+    __counter = 0
 
     dig_process = None
     infinite_dig_id = None
@@ -46,33 +40,14 @@ class Node():
         for node in self.pub_list:
             requests.post(url=f'http://{node.address}/message', json=frame)
 
-    def __init__(self, network_node_address, secret_key, app):
-        self.__secret_key = secret_key
-
-        seed = self.get_seed_from_file()
-        if seed is None:
-            self.__private_key = SigningKey.generate()
-        else:
-            self.__private_key = SigningKey(seed)
-        self.__public_key = self.__private_key.verify_key
-        self.save_keys()
-
-        self.__public_key_hex = self.__public_key.encode().hex()
-        self.app = app
-        self.__message_utils = MessageUtils(self.__private_key)
-
-        self.transaction_pool = TransactionPool()
-        self._processed_transaction_pools = []
-
+    def __setup(self, network_node_address):
+        self.__logger.error('Node::__setup')
         if network_node_address is not None:
             self.pub_list = []
 
-            def f():
-                self.app.logger.info("Sending request to connect new node")
-                requests.post(
-                    url=f'http://{network_node_address}/connect-node', json={})
-            start_time = threading.Timer(1, f)
-            start_time.start()
+            self.__logger.info("Sending request to connect new node")
+            requests.post(
+                url=f'http://{network_node_address}/connect-node', json={})
 
             block_list = requests.get(
                 url=f'http://{network_node_address}/blocks').json()
@@ -82,14 +57,14 @@ class Node():
         else:
             self.pub_list = [
                 NodeInfo(f"{socket.gethostbyname(socket.gethostname())}:5000",
-                         self.__public_key_hex)
+                         self.__key_manager.public_key)
             ]
             initial_prev_hash_hex = None  # uuid.uuid4().hex
             body = {
                 'message': 'Initial block',
             }
             block = Block.create(initial_prev_hash_hex,
-                                 body, self.__public_key_hex)
+                                 body, self.__key_manager.public_key)
 
             if os.path.exists(BLOCKCHAIN_FILE_PATH):
                 self.blockchain = BlockChain.load_blockchain(
@@ -100,26 +75,45 @@ class Node():
             else:
                 self.blockchain = BlockChain.create_blockchain([block])
 
-        dig_time = threading.Timer(1, self.__invoke_infinite_dig)
-        dig_time.start()
+        self.__logger.info('Setup done')
+        self.__invoke_infinite_dig()
+
+    def __init__(self, network_node_address, secret_key, app):
+        self.__key_manager = KeyManager(app.logger, secret_key)
+
+        self.app = app
+        self.__logger = app.logger
+        self.__message_utils = MessageUtils(self.__key_manager)
+
+        self.transaction_pool = TransactionPool()
+        self._processed_transaction_pools = []
+
+        miner_thread = Thread(target=self.__setup,
+                              args=(network_node_address,))
+        miner_thread.start()
 
     def infinite_dig(self):
         self.infinite_dig_id = uuid.uuid4()
         uuid_copy = self.infinite_dig_id
         while True:
             next_transaction = self.transaction_pool.get_next_transaction_json()
-            block_data = next_transaction if next_transaction else {}
+            block_data = next_transaction if next_transaction else {
+                "random_message": str(uuid.uuid4())}
 
             # start digging for new block and after that broadcast result
-            self.create_block(block_data)
+            block_added = self.create_block(block_data)
 
             if uuid_copy != self.infinite_dig_id:
                 break
-            elif next_transaction:
+            elif next_transaction and block_added:
+                self.app.logger.error(f'Message Added to block: {block_data}')
                 self.transaction_pool.pop_next_transaction()
+            else:
+                self.app.logger.error(
+                    f'Message NOT Added to block: {block_data}')
 
     def get_public_key(self):
-        return self.__public_key_hex
+        return self.__key_manager.public_key
 
     def update_pub_list(self, new_pub_list):
         self.pub_list = new_pub_list
@@ -167,15 +161,15 @@ class Node():
                 raise err
 
             if sender_pk_hex != self.get_public_key():
-                dig_time = threading.Timer(1, self.__invoke_infinite_dig)
-                dig_time.start()
+                mining = Thread(target=self.__invoke_infinite_dig)
+                mining.start()
 
         elif payload['type'] == 'start-digging':
             self.infinite_dig()
         else:
             return 'Unhandled message type'
 
-    def create_block(self, data):
+    def create_block(self, data) -> bool:
         new_block = self.blockchain._blocks[-1].create_next_block(
             data, self.get_public_key())
 
@@ -185,28 +179,23 @@ class Node():
             'block': new_block.to_json()
         }
         frame = self.__message_utils.wrap_message(payload)
+        sender_address = self.get_address_by_public_key(
+            self.__key_manager.public_key)
+        # send to other nodes
         for node in self.pub_list:
-            requests.post(url=f'http://{node.address}/message', json=frame)
+            if node.address == sender_address:
+                continue
+            response = requests.post(
+                url=f'http://{node.address}/message', json=frame)
+            if not response.ok:
+                return False
+        # send to myself
+        response = requests.post(
+            url=f'http://{sender_address}/message', json=frame)
+        if not response.ok:
+            return False
+        return True
 
     def add_transaction(self, data: dict):
         transaction = Transaction(get_order_directory_recursively(data))
         self.transaction_pool.add_transaction(transaction)
-
-    def save_keys(self):
-        keys_data = {
-            'seed': encrypt_by_secret_key(self.__secret_key, self.__private_key._seed.hex()),
-            'public_key': self.__public_key_hex
-        }
-        with open(KEYS_FILE_PATH, "w") as f:
-            f.write(json.dumps(keys_data))
-
-    def get_seed_from_file(self):
-        try:
-            seed = None
-            with open(KEYS_FILE_PATH, "r") as f:
-                keys_data = f.read()
-                seed = decrypt_by_secret_key(
-                    self.__secret_key, keys_data['seed'])
-            return bytes.fromhex(seed)
-        except Exception:
-            return None

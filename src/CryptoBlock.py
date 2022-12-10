@@ -2,7 +2,7 @@ from CryptoUtils import get_order_directory_recursively
 import hashlib
 
 max_nonce = 2 ** 32     # 4 billion
-difficulty_bits = 20    # 0 to 24 bits
+difficulty_bits = 21    # 0 to 24 bits
 target = 2 ** (256 - difficulty_bits)
 
 

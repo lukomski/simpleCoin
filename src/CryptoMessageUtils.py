@@ -1,17 +1,17 @@
 import json
 from nacl.signing import VerifyKey
+from CryptoKeyManager import KeyManager
 
 
 class MessageUtils:
-    __secret_key = None
 
-    def __init__(self, secret_key):
-        self.__secret_key = secret_key
+    def __init__(self, key_manager: KeyManager):
+        self.__key_manager = key_manager
         pass
 
     def wrap_message(self, payload: dict):
         payload_bytes = json.dumps(payload).encode('utf-8')
-        signature = self.__secret_key.sign(payload_bytes).signature.hex()
+        signature = self.__key_manager.sign(payload_bytes)
         return {
             'payload': payload,
             'signature': signature
