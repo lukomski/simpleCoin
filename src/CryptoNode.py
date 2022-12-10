@@ -37,6 +37,8 @@ class Node():
 
     dig_process = None
     infinite_dig_id = None
+    __processing_incoming_candidate_block = None
+    __digging_terminated = None
 
     def __invoke_infinite_dig(self):
         payload = {
@@ -92,11 +94,9 @@ class Node():
                                  body, self.__public_key_hex)
 
             if os.path.exists(BLOCKCHAIN_FILE_PATH):
-                self.blockchain = BlockChain.load_blockchain(
-                    BLOCKCHAIN_FILE_PATH)
+                self.blockchain = BlockChain.load_blockchain(BLOCKCHAIN_FILE_PATH)
                 if self.blockchain is None:
-                    raise ValueError(
-                        "Could not load/parse existing blockchain - remove file or correct it to start node.")
+                    raise ValueError("Could not load/parse existing blockchain - remove file or correct it to start node.")
             else:
                 self.blockchain = BlockChain.create_blockchain([block])
 
@@ -104,18 +104,17 @@ class Node():
         dig_time.start()
 
     def infinite_dig(self):
-        self.infinite_dig_id = uuid.uuid4()
-        uuid_copy = self.infinite_dig_id
-        while True:
+        self.__processing_incoming_candidate_block = False
+        self.__digging_terminated = False
+
+        while not self.__digging_terminated:
             next_transaction = self.transaction_pool.get_next_transaction_json()
             block_data = next_transaction if next_transaction else {}
 
             # start digging for new block and after that broadcast result
             self.create_block(block_data)
 
-            if uuid_copy != self.infinite_dig_id:
-                break
-            elif next_transaction:
+            if next_transaction and not self.__processing_incoming_candidate_block:
                 self.transaction_pool.pop_next_transaction()
 
     def get_public_key(self):
@@ -161,14 +160,30 @@ class Node():
             }
         elif payload['type'] == 'new_block':
             block = Block.load(payload['block'])
-            try:
-                self.blockchain.add_block(block)
-            except ValueError as err:
-                raise err
+            # stop digging
+            self.__processing_incoming_candidate_block = True
 
-            if sender_pk_hex != self.get_public_key():
-                dig_time = threading.Timer(1, self.__invoke_infinite_dig)
+            # validate block candidate
+            is_valid_block = self.blockchain.validate_candidate_block(block)
+            if is_valid_block:
+                self.blockchain.add_block(block)
+                self.__digging_terminated = True
+                # wait 2 seconds and start new dig process
+                dig_time = threading.Timer(2, self.__invoke_infinite_dig)
                 dig_time.start()
+
+                # current digging needs to be terminated and start new digging
+                # if sender_pk_hex != self.get_public_key():
+                #     self.__digging_terminated = True
+                #     # wait 2 seconds and start new dig process
+                #     dig_time = threading.Timer(2, self.__invoke_infinite_dig)
+                #     dig_time.start()
+                # else: # block came from me
+                #     # nothing to do - digging process continues
+                #     self.__processing_incoming_candidate_block = False
+
+            else: # block is invalid, can resume digging
+                self.__processing_incoming_candidate_block = False
 
         elif payload['type'] == 'start-digging':
             self.infinite_dig()
@@ -176,17 +191,19 @@ class Node():
             return 'Unhandled message type'
 
     def create_block(self, data):
+        # actual mining
         new_block = self.blockchain._blocks[-1].create_next_block(
             data, self.get_public_key())
 
-        # spread
-        payload = {
-            'type': 'new_block',
-            'block': new_block.to_json()
-        }
-        frame = self.__message_utils.wrap_message(payload)
-        for node in self.pub_list:
-            requests.post(url=f'http://{node.address}/message', json=frame)
+        if not self.__processing_incoming_candidate_block:
+            # spread
+            payload = {
+                'type': 'new_block',
+                'block': new_block.to_json()
+            }
+            frame = self.__message_utils.wrap_message(payload)
+            for node in self.pub_list:
+                requests.post(url=f'http://{node.address}/message', json=frame)
 
     def add_transaction(self, data: dict):
         transaction = Transaction(get_order_directory_recursively(data))
@@ -199,6 +216,9 @@ class Node():
         }
         with open(KEYS_FILE_PATH, "w") as f:
             f.write(json.dumps(keys_data))
+
+    def save_blockchain(self):
+        self.blockchain.save(BLOCKCHAIN_FILE_PATH)
 
     def get_seed_from_file(self):
         try:

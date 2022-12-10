@@ -44,15 +44,13 @@ class Block:
         # create block with basic data
         candidate_block = Block(prev_block_hash, block_data, miner_pub_key_hex)
         # solve proof of work
-        # TODO what to do when nonce is invalid
         (nonce, is_valid) = candidate_block.__proof_of_work()
         # assign found nonce value to block
         candidate_block._header['nonce'] = nonce
         candidate_block._nonce = nonce
 
         # calculate hash from prev_block_hash value + nonce to keep consistency in blockchain
-        candidate_block._header['hash_prev_nonce'] = candidate_block.__calculate_hash_prev_block_nonce(
-        )
+        candidate_block._header['hash_prev_nonce'] = candidate_block.__calculate_hash_prev_block_nonce()
         return candidate_block
 
     @staticmethod
@@ -110,7 +108,6 @@ class Block:
 
         :returns: Tuple of valid nonce (if found, otherwise, max possible nonce value - 1) and bool (if nonce is valid).
         '''
-        # TODO
         # calculate the difficulty target
         for nonce in range(max_nonce):  # check all possible nonce values
             if self.__verify_nonce(nonce):  # verify specific nonce value

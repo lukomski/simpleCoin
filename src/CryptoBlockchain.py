@@ -15,34 +15,33 @@ class BlockChain:
         :type  generic_block: Block
         '''
         self._blocks = [generic_block]
-        self.save(FILE_NAME)
 
     def add_block(self, new_block: Block):
-        last_block = self._blocks[-1]
-
-        prev_block_hash = last_block.get_block_hash()
-        prev_hash = new_block.get_prev_hash()
-
-        if prev_block_hash != prev_hash:
-            raise ValueError(f"Invalid previous block hash")
-
-        block_valid = new_block.verify_block()
-        if not block_valid:
-            raise ValueError("Invalid block")
-
         self._blocks.append(new_block)
-        self.save(FILE_NAME)
 
-    def add_block_from_data(self, data: dict, miner_pub_key: str):
-        block = Block.create(
-            self._blocks[-1].get_block_hash(), data, miner_pub_key)
-        self.add_block(block)
+    # def add_block_from_data(self, data: dict, miner_pub_key: str):
+    #     block = Block.create(
+    #         self._blocks[-1].get_block_hash(), data, miner_pub_key)
+    #     self.add_block(block)
 
     def to_json(self):
         blocks = []
         for block in self._blocks:
             blocks.append(block.to_json())
         return blocks
+
+    def validate_candidate_block(self, candidate_block: Block) -> bool:
+        last_block_hash = self._blocks[-1].get_block_hash()
+        prev_block_hash_in_candidate = candidate_block.get_prev_hash()
+
+        # candidate block's previous hash needs to match hash of last block in current blockchain
+        if (last_block_hash != prev_block_hash_in_candidate):
+            return False
+        
+        is_candidate_block_consistent = candidate_block.verify_block()
+        if not is_candidate_block_consistent:
+            return False
+        return True
 
     def validate(self):
         '''
@@ -97,6 +96,12 @@ class BlockChain:
 
         for i in range(1, len(blockchain_list)):
             try:
+                block = blockchain_list[i]
+                is_valid_block = blockchain.validate_candidate_block(block)
+
+                if not is_valid_block:
+                    raise ValueError("Found inconsistency in loaded blockchain.")
+
                 blockchain.add_block(blockchain_list[i])
             except ValueError as err:
                 raise ValueError(

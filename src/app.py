@@ -211,6 +211,10 @@ def create_next_transaction():
     node.add_transaction(data)
     return "ok"
 
+@app.route('/save-to-file', methods=['POST'])
+def save_blockchain_to_file():
+    node.save_blockchain()
+    return "ok"
 
 @app.route("/message", methods=["POST"])
 def read_message():
