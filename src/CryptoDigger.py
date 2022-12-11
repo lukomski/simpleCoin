@@ -9,6 +9,7 @@ import time
 from logging import Logger
 import requests
 from datetime import datetime
+from CryptoInput import Input
 
 max_nonce = 2 ** 32     # 4 billion
 
@@ -46,14 +47,17 @@ class Digger():
                                   body, self.__key_manager.public_key)
 
             (nonce, is_successfull) = self.__proof_of_work(generic_block)
-            generic_block._header['nonce'] = nonce
+            generic_block.set_nonce(nonce)
             # calculate hash from prev_block_hash value + nonce to keep consistency in blockchain
-            generic_block._header['hash_prev_nonce'] = generic_block.calculate_hash_prev_block_nonce(
-            )
+            generic_block.set_prev_hash_nonce(generic_block.calculate_hash_prev_block_nonce(
+            ))
             self.__blockchain.add_block(generic_block)
 
         while not self.__is_terminated:
-            block_data = self.__transaction_pool.get_next_transaction_json()
+            transaction_data = self.__transaction_pool.get_next_transaction_json()
+            block_data = {
+                'transactions': transaction_data if transaction_data is None else [transaction_data]
+            }
 
             begin = datetime.now()
 
@@ -70,10 +74,10 @@ class Digger():
             if not is_successfull:
                 continue
 
-            candidate_block._header['nonce'] = nonce
+            candidate_block.set_nonce(nonce)
             # calculate hash from prev_block_hash value + nonce to keep consistency in blockchain
-            candidate_block._header['hash_prev_nonce'] = candidate_block.calculate_hash_prev_block_nonce(
-            )
+            candidate_block.set_prev_hash_nonce(candidate_block.calculate_hash_prev_block_nonce(
+            ))
 
             counter = 0
             while self.__is_waiting:
@@ -88,10 +92,10 @@ class Digger():
 
             propagated_successfully = self.__propagate_candidate_block(
                 candidate_block)
-            if propagated_successfully and block_data is not None:
-                if block_data is not None and 'message' in block_data and 'Some transaction' in block_data['message']:
+            if propagated_successfully and transaction_data is not None:
+                if transaction_data is not None and 'message' in transaction_data and 'Some transaction' in transaction_data['message']:
                     self.__logger.info(
-                        f'Pop transaction {block_data["message"]}')
+                        f'Pop transaction {transaction_data["message"]}')
                 self.__transaction_pool.pop_next_transaction()
 
     def pause_mining(self) -> None:
@@ -137,3 +141,41 @@ class Digger():
 
     def get_blockchain(self):
         return self.__blockchain
+
+    def get_inputs(self, target_owner: str) -> list[Input]:
+        self.__logger.info(f'get_inputs for owner: "{target_owner}"')
+        all_transactions = self.__blockchain.get_transactions()
+        self.__logger.info(
+            f'get_inputs found {len(all_transactions)} transactions')
+        transaction_sources = {}
+        for transaction in all_transactions:
+            inputs = transaction.get_inputs()
+            outputs = transaction.get_outputs()
+            # remove from sources used outputs
+            for input in inputs:
+                source_transaction_id = input.get_transaction_id()
+                if input.get_owner() != target_owner:
+                    continue
+                if source_transaction_id not in transaction_sources:
+                    self.__logger.warning(
+                        f'In transaction_sources {transaction.to_json()} input {input.to_json()} has no valid previous source')
+                    continue
+                transaction_sources.pop(source_transaction_id)
+            # add to sources outputs from block
+            transaction_id = transaction.get_transaction_id()
+            for output in outputs:
+                owner = output.get_owner()
+                if owner != target_owner:
+                    continue
+                self.__logger.info(
+                    f'Found output for owner {output.to_json()}')
+                if transaction_id in transaction_sources:
+                    self.__logger.warning(
+                        f'In transaction_sources {transaction.to_json()} output {output.to_json()} try to add the same transaction - transaction id should be unique')
+                    continue
+                self.__logger.info(
+                    f'CryptoInputs::get_inputs output: {output.to_json()} transaction_id: {transaction_id}')
+                new_input = Input.output_to_input(
+                    output, transaction_id, logger=self.__logger)
+                transaction_sources[transaction_id] = new_input
+        return list(transaction_sources.values())

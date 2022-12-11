@@ -1,15 +1,5 @@
 
-from CryptoUtils import get_order_directory_recursively
-
-
-class Transaction:
-    _data: dict = None
-
-    def __init__(self, data: dict):
-        self._data = data
-
-    def to_json(self):
-        return get_order_directory_recursively(self._data)
+from CryptoTransaction import Transaction
 
 
 class TransactionPool:

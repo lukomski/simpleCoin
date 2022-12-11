@@ -225,8 +225,9 @@ def send_message():
 @app.route('/transaction', methods=['POST'])
 def create_next_transaction():
     data = request.get_json()
-    node.add_transaction(data)
-    return "ok"
+    message, status = node.add_transaction(
+        sender=data['sender'], receiver=data['receiver'], message=data['message'], amount=data['amount'])
+    return message, status
 
 
 @app.route('/save-to-file', methods=['POST'])

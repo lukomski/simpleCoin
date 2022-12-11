@@ -9,7 +9,6 @@ from CryptoBlock import Block
 from CryptoBlockchain import BlockChain
 from CryptoKeyManager import KeyManager
 from threading import Thread
-import multiprocessing
 import os
 from CryptoTransactionPool import TransactionPool, Transaction
 from CryptoUtils import get_order_directory_recursively, encrypt_by_secret_key, decrypt_by_secret_key
@@ -17,10 +16,14 @@ import uuid
 import time
 from datetime import datetime
 from CryptoDigger import Digger
-
+import json
+import math
+from CryptoOutput import Output
 BLOCKCHAIN_FILE_PATH = "blockchain.json"
 OK = 200
 BAD_REQUEST = 400
+
+TRANSACTION_FEE_SHARE = 0.01
 
 
 class Node():
@@ -132,9 +135,33 @@ class Node():
         else:
             return 'Unhandled message type', BAD_REQUEST
 
-    def add_transaction(self, data: dict):
-        transaction = Transaction(get_order_directory_recursively(data))
+    def add_transaction(self, sender: str, receiver: str, amount: int, message: str):
+        transaction_id = str(uuid.uuid4())
+        transaction_fee = math.ceil(amount * TRANSACTION_FEE_SHARE)
+        valid_inputs = self.__digger.get_inputs(sender)
+        self.__logger.info(f'valid_inputs: {len(valid_inputs)}')
+        outputs = [
+            Output(owner=receiver, amount=amount)
+        ]
+        # create data without signature
+        data = {
+            'transaction_id': transaction_id,
+            'transaction_fee': transaction_fee,
+            'inputs': [input.to_json() for input in valid_inputs],
+            'outputs': [output.to_json() for output in outputs],
+            'message': message
+        }
+        signature = self.__key_manager.sign(json.dumps(data).encode('utf-8'))
+        # add signature to data
+        data = {**data, 'signature': signature}
+        message, is_valid = Transaction.is_valid(data, self.__logger)
+        if not is_valid:
+            return f'Invalid transaction: {message}', BAD_REQUEST
+
+        transaction = Transaction(transaction_id=data['transaction_id'], transaction_fee=data['transaction_fee'],
+                                  signature=data['signature'], inputs=data['inputs'], outputs=data['outputs'], message=data['message'])
         self.__digger.add_transaction(transaction)
+        return 'ok', OK
 
     def save_blockchain(self):
         self.__digger.__blockchain.save(BLOCKCHAIN_FILE_PATH)

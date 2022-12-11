@@ -1,4 +1,5 @@
 from CryptoBlock import Block
+from CryptoTransaction import Transaction
 import json
 
 FILE_NAME = "blockchain.json"
@@ -7,7 +8,7 @@ FILE_NAME = "blockchain.json"
 class BlockChain:
     _blocks: list[Block] = None
 
-    def __init__(self, generic_block: Block|None):
+    def __init__(self, generic_block: Block | None):
         '''
         Initializes 'BlockChain' class instance with initial generic block.
 
@@ -35,7 +36,7 @@ class BlockChain:
         # candidate block's previous hash needs to match hash of last block in current blockchain
         if (last_block_hash != prev_block_hash_in_candidate):
             return False
-        
+
         is_candidate_block_consistent = candidate_block.verify_block()
         if not is_candidate_block_consistent:
             return False
@@ -98,7 +99,8 @@ class BlockChain:
                 is_valid_block = blockchain.validate_candidate_block(block)
 
                 if not is_valid_block:
-                    raise ValueError("Found inconsistency in loaded blockchain.")
+                    raise ValueError(
+                        "Found inconsistency in loaded blockchain.")
 
                 blockchain.add_block(blockchain_list[i])
             except ValueError as err:
@@ -132,3 +134,10 @@ class BlockChain:
             return None
         except ValueError:
             return None
+
+    def get_transactions(self) -> list[Transaction]:
+        transactions = []
+        for block in self._blocks:
+            block_transactions = block.get_transactions()
+            transactions.extend(block_transactions)
+        return transactions

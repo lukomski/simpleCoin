@@ -31,3 +31,28 @@ def decrypt_by_secret_key(secret_key_hex: str, encrypted_text_hex: str) -> str:
     decrypted_bytes = box.decrypt(encrypted_text_bytes)
     decrypted = decrypted_bytes.decode('utf-8')
     return decrypted
+
+
+def is_valid(config, data):
+    out = {}
+    for requested_field in config.keys():
+        # check for needed fiels
+        if not requested_field in data:
+            if 'optional' in config[requested_field] and config[requested_field]['optional']:
+                continue
+            return f'Field "{requested_field}" is required', False
+        # check type
+        if 'list' in config[requested_field] and config[requested_field]['list']:
+            for field_item in data[requested_field]:
+                message, is_valid = config[requested_field]['type'].is_valid(
+                    field_item)
+                if not is_valid:
+                    return f'In "{requested_field}" list element {field_item}: {message}', False
+        elif not isinstance(data[requested_field], config[requested_field]['type']):
+            return f'Field "{requested_field}" should be instance {str(config[requested_field]["type"])} but is {str(type(data[requested_field]))}', False
+        out[requested_field] = data[requested_field]
+    # check for not needed fields
+    for requested_field in data.keys():
+        if requested_field not in config:
+            return f'Found illicit field {requested_field}', False
+    return 'ok', True

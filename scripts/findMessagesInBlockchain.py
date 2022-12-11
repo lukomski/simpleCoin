@@ -20,8 +20,12 @@ print('count_blocks: ', len(blockchain))
 
 found_blocks = []
 for block in blockchain:
-    if block['data'] is not None:
-        if 'message' in block['data'] and finding_message in block['data']['message']:
+    if block['data'] is None:
+        continue
+    if 'transactions' not in block['data'] or block['data']['transactions'] is None:
+        continue
+    for transaction in block['data']['transactions']:
+        if 'message' in transaction and finding_message in transaction['message']:
             found_blocks.append(block)
 print(f'Found blocks ({len(found_blocks)}):')
 print(json.dumps(found_blocks, indent=1))

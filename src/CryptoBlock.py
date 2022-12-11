@@ -1,8 +1,10 @@
 from CryptoUtils import get_order_directory_recursively
+from CryptoTransactionPool import Transaction
 import hashlib
 
 difficulty_bits = 18    # 0 to 24 bits
 target = 2 ** (256 - difficulty_bits)
+
 
 class Block:
     '''
@@ -17,8 +19,8 @@ class Block:
     #   'hash_prev_nonce' : <str>
     #   'miner_pub_key'   : <str>
     # }
-    _header: dict = None
-    _data: dict = None
+    __header: dict = None
+    __data: dict = None
 
     @staticmethod
     def load(candidate_block_object: dict):
@@ -27,8 +29,8 @@ class Block:
             candidate_block_object['data'],
             candidate_block_object['header']['miner_pub_key']
         )
-        candidate_block._header['nonce'] = candidate_block_object['header']['nonce']
-        candidate_block._header['hash_prev_nonce'] = candidate_block_object['header']['hash_prev_nonce']
+        candidate_block.__header['nonce'] = candidate_block_object['header']['nonce']
+        candidate_block.__header['hash_prev_nonce'] = candidate_block_object['header']['hash_prev_nonce']
         return candidate_block
 
     @staticmethod
@@ -51,13 +53,13 @@ class Block:
         :param miner_pub_key: Miner public key.
         :type  miner_pub_key: str
         '''
-        self._header = {
+        self.__header = {
             'prev_block_hash': prev_block_hash,
             # 'nonce'           : <str>
             # 'hash_prev_nonce' : <str>
             'miner_pub_key': miner_pub_key
         }
-        self._data = block_data
+        self.__data = block_data
 
     def get_block_hash(self):
         '''
@@ -88,7 +90,7 @@ class Block:
         return is_nonce_valid
 
     def calculate_hash_prev_block_nonce(self):
-        nonce = self._header['nonce']
+        nonce = self.__header['nonce']
         prev_block_hash = self.get_prev_hash()
 
         hash_prev_block_nonce = hashlib.sha256(
@@ -99,15 +101,15 @@ class Block:
 
     def get_pow_data(self):
         return get_order_directory_recursively({
-            'data': self._data,
+            'data': self.__data,
             'header': {
-                'miner_pub_key': self._header['miner_pub_key'],
+                'miner_pub_key': self.__header['miner_pub_key'],
                 'prev_block_hash': self.get_prev_hash(),
             }
         })
 
     def get_prev_hash(self):
-        return self._header['prev_block_hash']
+        return self.__header['prev_block_hash']
 
     def verify_block(self):
         '''
@@ -118,7 +120,7 @@ class Block:
         :returns: True if block is correct, otherwise False
         '''
         # check if nonce value solves proof of work
-        is_valid = self.verify_nonce(self._header['nonce'])
+        is_valid = self.verify_nonce(self.__header['nonce'])
         # if not is_valid:
         #    pow_obj = self.get_pow_data()
         #    find hash value for header
@@ -128,7 +130,7 @@ class Block:
 
         # check if calculated h(prev. block hash + nonce) matches value placed in header
         prev_block_nonce_hash_calculated = self.calculate_hash_prev_block_nonce()
-        prev_block_nonce_hash = self._header['hash_prev_nonce']
+        prev_block_nonce_hash = self.__header['hash_prev_nonce']
 
         # final verification
         valid_block = is_valid and (
@@ -143,7 +145,28 @@ class Block:
         '''
         # restore block object as dictionary
         block_object = get_order_directory_recursively({
-            'data': self._data,
-            'header': self._header
+            'data': self.__data,
+            'header': self.__header
         })
         return block_object
+
+    def get_transactions(self) -> list[Transaction]:
+        if self.__data == None:
+            return []
+        if 'transactions' not in self.__data:
+            return []
+        if self.__data['transactions'] is None:
+            return []
+        transactions = []
+        for transaction_dict in self.__data['transactions']:
+            _, valid = Transaction.is_valid(transaction_dict)
+            if valid:
+                transaction = Transaction(**transaction_dict)
+                transactions.append(transaction)
+        return transactions
+
+    def set_nonce(self, nonce: str) -> None:
+        self.__header['nonce'] = nonce
+
+    def set_prev_hash_nonce(self, prev_hash_nonce: str) -> None:
+        self.__header['hash_prev_nonce'] = prev_hash_nonce
