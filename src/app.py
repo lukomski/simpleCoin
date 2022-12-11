@@ -242,8 +242,8 @@ def read_message():
 
     sender_pkey_hex = node.get_public_key_by_address(request_addr)
 
-    object = node.read_message(object, sender_pkey_hex)
-    return "ok"
+    message, status = node.read_message(object, sender_pkey_hex)
+    return message, status
 
 
 @app.route("/last-block-hash", methods=["GET"])

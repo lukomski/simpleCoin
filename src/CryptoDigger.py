@@ -12,6 +12,7 @@ from datetime import datetime
 
 max_nonce = 2 ** 32     # 4 billion
 
+
 class Digger():
     __is_waiting: bool = None
     __is_terminated: bool = None
@@ -40,13 +41,15 @@ class Digger():
     def __w_start(self) -> None:
         if len(self.__blockchain._blocks) == 0:
             initial_prev_hash_hex = None  # uuid.uuid4().hex
-            body = { 'message': 'Initial block' }
-            generic_block = Block(initial_prev_hash_hex, body, self.__key_manager.public_key)
+            body = {'message': 'Initial block'}
+            generic_block = Block(initial_prev_hash_hex,
+                                  body, self.__key_manager.public_key)
 
             (nonce, is_successfull) = self.__proof_of_work(generic_block)
             generic_block._header['nonce'] = nonce
             # calculate hash from prev_block_hash value + nonce to keep consistency in blockchain
-            generic_block._header['hash_prev_nonce'] = generic_block.calculate_hash_prev_block_nonce()
+            generic_block._header['hash_prev_nonce'] = generic_block.calculate_hash_prev_block_nonce(
+            )
             self.__blockchain.add_block(generic_block)
 
         while not self.__is_terminated:
@@ -57,7 +60,7 @@ class Digger():
             candidate_block = Block(self.__blockchain._blocks[-1].get_block_hash(),
                                     block_data,
                                     self.__key_manager.public_key)
-            
+
             (nonce, is_successfull) = self.__proof_of_work(candidate_block)
 
             end = datetime.now()
@@ -66,23 +69,29 @@ class Digger():
 
             if not is_successfull:
                 continue
-        
+
             candidate_block._header['nonce'] = nonce
             # calculate hash from prev_block_hash value + nonce to keep consistency in blockchain
-            candidate_block._header['hash_prev_nonce'] = candidate_block.calculate_hash_prev_block_nonce()
+            candidate_block._header['hash_prev_nonce'] = candidate_block.calculate_hash_prev_block_nonce(
+            )
 
             counter = 0
             while self.__is_waiting:
                 time.sleep(0.001)
                 if counter % 1000 == 0:
-                    self.__logger.info("Waiting another second for processing candidate block")
+                    self.__logger.info(
+                        "Waiting another second for processing candidate block")
                 counter += 1
-            
+
             if candidate_block.get_prev_hash() != self.__blockchain._blocks[-1].get_block_hash():
                 continue
 
-            propagated_successfully = self.__propagate_candidate_block(candidate_block)
-            if propagated_successfully:
+            propagated_successfully = self.__propagate_candidate_block(
+                candidate_block)
+            if propagated_successfully and block_data is not None:
+                if block_data is not None and 'message' in block_data and 'Some transaction' in block_data['message']:
+                    self.__logger.info(
+                        f'Pop transaction {block_data["message"]}')
                 self.__transaction_pool.pop_next_transaction()
 
     def pause_mining(self) -> None:
@@ -96,7 +105,8 @@ class Digger():
 
     def __propagate_candidate_block(self, candidate_block: Block) -> bool:
         if self.__spread_candidate_block_function is not None:
-            is_spread_successful = self.__spread_candidate_block_function(candidate_block)
+            is_spread_successful = self.__spread_candidate_block_function(
+                candidate_block)
             return is_spread_successful
         else:
             return False

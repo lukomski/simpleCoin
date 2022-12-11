@@ -19,6 +19,9 @@ from datetime import datetime
 from CryptoDigger import Digger
 
 BLOCKCHAIN_FILE_PATH = "blockchain.json"
+OK = 200
+BAD_REQUEST = 400
+
 
 class Node():
     __message_utils = None
@@ -37,8 +40,10 @@ class Node():
             self.pub_list = []
 
             self.__logger.info("Sending request to connect new node")
-            requests.post(url=f'http://{network_node_address}/connect-node', json={})
-            block_list = requests.get(url=f'http://{network_node_address}/blocks').json()
+            requests.post(
+                url=f'http://{network_node_address}/connect-node', json={})
+            block_list = requests.get(
+                url=f'http://{network_node_address}/blocks').json()
 
             block_list = Block.load_list(block_list)
             blockchain = BlockChain.create_blockchain(block_list)
@@ -50,11 +55,13 @@ class Node():
             if os.path.exists(BLOCKCHAIN_FILE_PATH):
                 blockchain = BlockChain.load_blockchain(BLOCKCHAIN_FILE_PATH)
                 if blockchain is None:
-                    raise ValueError("Could not load/parse existing blockchain - remove file or correct it to start node.")
+                    raise ValueError(
+                        "Could not load/parse existing blockchain - remove file or correct it to start node.")
             else:
                 blockchain = BlockChain(None)
 
-        self.__digger = Digger(blockchain, self.__key_manager, self.__logger, self.spread_candidate_block)
+        self.__digger = Digger(
+            blockchain, self.__key_manager, self.__logger, self.spread_candidate_block)
         self.__logger.info('Setup done')
         self.__digger.start_mining()
 
@@ -65,7 +72,8 @@ class Node():
         self.__logger = app.logger
         self.__message_utils = MessageUtils(self.__key_manager)
 
-        setup_thread = Thread(target=self.__setup, args=(network_node_address,))
+        setup_thread = Thread(target=self.__setup,
+                              args=(network_node_address,))
         setup_thread.start()
 
     def get_public_key(self):
@@ -98,7 +106,8 @@ class Node():
             url=f"http://{address}/message", json=frame)
 
     def read_message(self, frame: dict, sender_pk_hex: str):
-        self.__message_utils.verify_message(frame, bytes.fromhex(sender_pk_hex))
+        self.__message_utils.verify_message(
+            frame, bytes.fromhex(sender_pk_hex))
 
         payload = self.__message_utils.getPayload(frame)
         if (payload['type'] == 'message'):
@@ -115,9 +124,13 @@ class Node():
             is_valid_block = self.__digger.get_blockchain().validate_candidate_block(block)
             if is_valid_block:
                 self.__digger.get_blockchain().add_block(block)
+
             self.__digger.resume_mining()
+            status = OK if is_valid_block else BAD_REQUEST
+            message = 'ok' if is_valid_block else 'Unable to validate block'
+            return message, status
         else:
-            return 'Unhandled message type'
+            return 'Unhandled message type', BAD_REQUEST
 
     def add_transaction(self, data: dict):
         transaction = Transaction(get_order_directory_recursively(data))
@@ -133,18 +146,21 @@ class Node():
             'block': candidate_block.to_json()
         }
         frame = self.__message_utils.wrap_message(payload)
-        sender_address = self.get_address_by_public_key(self.__key_manager.public_key)
+        sender_address = self.get_address_by_public_key(
+            self.__key_manager.public_key)
         # send to other nodes
         for node in self.pub_list:
             if node.address == sender_address:
                 continue
 
-            response = requests.post(url=f'http://{node.address}/message', json=frame)
+            response = requests.post(
+                url=f'http://{node.address}/message', json=frame)
 
             if not response.ok:
                 return False
         # send to myself
-        response = requests.post(url=f'http://{sender_address}/message', json=frame)
+        response = requests.post(
+            url=f'http://{sender_address}/message', json=frame)
         if not response.ok:
             return False
         return True
