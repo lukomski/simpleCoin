@@ -1,9 +1,26 @@
 from CryptoNodeInfo import NodeInfo
 from flask import Flask, request, render_template
 import os
+from logging.config import dictConfig
 
 import requests
 from CryptoNode import Node
+
+dictConfig({
+    'version': 1,
+    'formatters': {'default': {
+        'format': '[%(asctime)s] %(levelname)s in %(module)s: %(message)s',
+    }},
+    'handlers': {'wsgi': {
+        'class': 'logging.StreamHandler',
+        'stream': 'ext://flask.logging.wsgi_errors_stream',
+        'formatter': 'default'
+    }},
+    'root': {
+        'level': 'INFO',
+        'handlers': ['wsgi']
+    }
+})
 
 
 app = Flask(__name__)
@@ -211,10 +228,12 @@ def create_next_transaction():
     node.add_transaction(data)
     return "ok"
 
+
 @app.route('/save-to-file', methods=['POST'])
 def save_blockchain_to_file():
     node.save_blockchain()
     return "ok"
+
 
 @app.route("/message", methods=["POST"])
 def read_message():

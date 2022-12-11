@@ -2,7 +2,7 @@ from CryptoUtils import get_order_directory_recursively
 import hashlib
 
 max_nonce = 2 ** 32     # 4 billion
-difficulty_bits = 20    # 0 to 24 bits
+difficulty_bits = 18    # 0 to 24 bits
 target = 2 ** (256 - difficulty_bits)
 
 
@@ -50,7 +50,8 @@ class Block:
         candidate_block._nonce = nonce
 
         # calculate hash from prev_block_hash value + nonce to keep consistency in blockchain
-        candidate_block._header['hash_prev_nonce'] = candidate_block.__calculate_hash_prev_block_nonce()
+        candidate_block._header['hash_prev_nonce'] = candidate_block.__calculate_hash_prev_block_nonce(
+        )
         return candidate_block
 
     @staticmethod

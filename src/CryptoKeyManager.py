@@ -22,6 +22,14 @@ class KeyManager:
         self.save_keys()
         pass
 
+    def sign(self, payload_bytes: bytes):
+        '''
+        Get signature for payload bytes.
+        Returned value is hex representation of the signature.
+        '''
+        signature = self.__private_key.sign(payload_bytes).signature.hex()
+        return signature
+
     def save_keys(self):
         keys_data = {
             'seed': encrypt_by_secret_key(self.__secret_key, self.__private_key._seed.hex()),
@@ -40,11 +48,3 @@ class KeyManager:
             return bytes.fromhex(seed)
         except Exception:
             return None
-
-    def sign(self, payload_bytes: bytes):
-        '''
-        Get signature for payload bytes.
-        Returned value is hex representation of the signature.
-        '''
-        signature = self.__private_key.sign(payload_bytes).signature.hex()
-        return signature

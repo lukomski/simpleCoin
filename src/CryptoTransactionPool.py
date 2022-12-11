@@ -19,7 +19,7 @@ class TransactionPool:
         self._transactions = []
 
     def add_transaction(self, transaction: Transaction):
-        self._transactions.append(transaction)
+        self._transactions.insert(0, transaction)
 
     def get_next_transaction_json(self):
         return self._transactions[-1].to_json() if len(self._transactions) > 0 else None
