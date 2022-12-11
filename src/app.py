@@ -50,7 +50,7 @@ def get_nodes():
 
 @app.route('/blocks')
 def get_blocks():
-    return node.blockchain.to_json()
+    return node.get_digger().get_blockchain().to_json()
 
 
 @app.route('/public-key')

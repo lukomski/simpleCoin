@@ -7,22 +7,20 @@ FILE_NAME = "blockchain.json"
 class BlockChain:
     _blocks: list[Block] = None
 
-    def __init__(self, generic_block: Block):
+    def __init__(self, generic_block: Block|None):
         '''
         Initializes 'BlockChain' class instance with initial generic block.
 
         :param generic_block: Generic block for blockchain.
         :type  generic_block: Block
         '''
-        self._blocks = [generic_block]
+        if generic_block is None:
+            self._blocks = []
+        else:
+            self._blocks = [generic_block]
 
     def add_block(self, new_block: Block):
         self._blocks.append(new_block)
-
-    # def add_block_from_data(self, data: dict, miner_pub_key: str):
-    #     block = Block.create(
-    #         self._blocks[-1].get_block_hash(), data, miner_pub_key)
-    #     self.add_block(block)
 
     def to_json(self):
         blocks = []

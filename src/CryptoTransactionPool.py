@@ -25,6 +25,8 @@ class TransactionPool:
         return self._transactions[-1].to_json() if len(self._transactions) > 0 else None
 
     def pop_next_transaction(self):
+        if len(self._transactions) == 0:
+            return
         return self._transactions.pop()
 
     def to_json(self):
