@@ -140,9 +140,21 @@ class Node():
         transaction_fee = math.ceil(amount * TRANSACTION_FEE_SHARE)
         valid_inputs = self.__digger.get_inputs(sender)
         self.__logger.info(f'valid_inputs: {len(valid_inputs)}')
+
+        available_balance = 0
+        for input in valid_inputs:
+            available_balance += input.get_amount()
+
+        spend_amount = transaction_fee + amount
+        if available_balance < spend_amount:
+            return f'Not enough account balance need {spend_amount} but has {available_balance}', BAD_REQUEST
+
         outputs = [
-            Output(owner=receiver, amount=amount)
+            Output(owner=receiver, amount=amount),
         ]
+        change_amount = available_balance - spend_amount
+        if change_amount > 0:
+            outputs.append(Output(owner=sender, amount=change_amount))
         # create data without signature
         data = {
             'transaction_id': transaction_id,
@@ -194,3 +206,25 @@ class Node():
 
     def get_digger(self):
         return self.__digger
+
+    def get_wallet_balance(self):
+        owner = self.__key_manager.public_key
+        valid_inputs = self.__digger.get_inputs(owner)
+
+        available_balance = 0
+        for input in valid_inputs:
+            available_balance += input.get_amount()
+
+        mining_inputs = 0
+        for valid_input in valid_inputs:
+            if valid_input.get_transaction_id() == Digger.get_block_price_id():
+                mining_inputs += 1
+
+        return {
+            'available_balance': available_balance,
+            'valid_inputs': [valid_input.to_json() for valid_input in valid_inputs if valid_input.get_transaction_id() != Digger.get_block_price_id()],
+            'additional_mining_inputs': {
+                'amount_blocks': mining_inputs,
+                'summary_balance': mining_inputs * Digger.get_block_price_amount()
+            }
+        }

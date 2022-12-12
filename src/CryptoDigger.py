@@ -13,6 +13,9 @@ from CryptoInput import Input
 
 max_nonce = 2 ** 32     # 4 billion
 
+BLOCK_PRICE_ID = 'block_mining_price'
+BLOCK_PRICE_AMOUNT = 5
+
 
 class Digger():
     __is_waiting: bool = None
@@ -145,8 +148,10 @@ class Digger():
     def get_inputs(self, target_owner: str) -> list[Input]:
         self.__logger.info(f'get_inputs for owner: "{target_owner}"')
         all_transactions = self.__blockchain.get_transactions()
+        mined_blocks = len(self.__blockchain.get_mined_blocks(target_owner))
         self.__logger.info(
-            f'get_inputs found {len(all_transactions)} transactions')
+            f'mined_blocks: found {mined_blocks} mined_blocks')
+        self.__logger.info(f'Found all_transactions: {len(all_transactions)}')
         transaction_sources = {}
         for transaction in all_transactions:
             inputs = transaction.get_inputs()
@@ -156,7 +161,14 @@ class Digger():
                 source_transaction_id = input.get_transaction_id()
                 if input.get_owner() != target_owner:
                     continue
-                if source_transaction_id not in transaction_sources:
+                if source_transaction_id == BLOCK_PRICE_ID:
+                    if mined_blocks > 0:
+                        mined_blocks -= 1
+                    else:
+                        self.__logger(
+                            f'Input {input.to_json()} in transaction {transaction.to_json()} get block mining price which does not have')
+                    continue
+                elif source_transaction_id not in transaction_sources:
                     self.__logger.warning(
                         f'In transaction_sources {transaction.to_json()} input {input.to_json()} has no valid previous source')
                     continue
@@ -178,4 +190,19 @@ class Digger():
                 new_input = Input.output_to_input(
                     output, transaction_id, logger=self.__logger)
                 transaction_sources[transaction_id] = new_input
-        return list(transaction_sources.values())
+
+        self.__logger.info(f'After mined_blocks: {mined_blocks}')
+        inputs = list(transaction_sources.values())
+        for _ in range(mined_blocks):
+            new_input = Input(transaction_id=BLOCK_PRICE_ID,
+                              owner=target_owner, amount=BLOCK_PRICE_AMOUNT)
+            inputs.append(new_input)
+        return inputs
+
+    @staticmethod
+    def get_block_price_id():
+        return BLOCK_PRICE_ID
+
+    @staticmethod
+    def get_block_price_amount():
+        return BLOCK_PRICE_AMOUNT

@@ -170,3 +170,6 @@ class Block:
 
     def set_prev_hash_nonce(self, prev_hash_nonce: str) -> None:
         self.__header['hash_prev_nonce'] = prev_hash_nonce
+
+    def get_miner(self) -> str:
+        return self.__header['miner_pub_key']

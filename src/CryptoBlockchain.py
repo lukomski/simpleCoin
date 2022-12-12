@@ -141,3 +141,11 @@ class BlockChain:
             block_transactions = block.get_transactions()
             transactions.extend(block_transactions)
         return transactions
+
+    def get_mined_blocks(self, owner: str) -> list[Block]:
+        blocks = []
+        for block in self._blocks:
+            if block.get_miner() != owner:
+                continue
+            blocks.append(block)
+        return blocks
