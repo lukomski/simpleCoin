@@ -2,7 +2,7 @@ from CryptoUtils import get_order_directory_recursively
 from CryptoTransactionPool import Transaction
 import hashlib
 
-difficulty_bits = 18    # 0 to 24 bits
+difficulty_bits = 16    # 0 to 24 bits
 target = 2 ** (256 - difficulty_bits)
 
 

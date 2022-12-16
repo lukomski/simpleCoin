@@ -26,10 +26,11 @@ dictConfig({
 app = Flask(__name__)
 reference_address = os.environ.get("REFERENCE_ADDRESS", None)
 secret_key = os.environ.get("SECRET_KEY", None)
+ignore_address = os.environ.get("IGNORE_ADDRESS", None)
 if secret_key == None:
     raise AssertionError('Need SECRET_KEY defined to store keys in secure way')
 
-node = Node(reference_address, secret_key, app)
+node = Node(reference_address, secret_key, app, ignore_address=ignore_address)
 print(node.pub_list)
 
 app.node = node
@@ -99,7 +100,7 @@ def connect_node():
 
             updated_connections = serialize_updated_nodes(node)
             for nodeInfo in node.pub_list:
-                if nodeInfo.public_key_hex == node.get_public_key():
+                if nodeInfo.public_key == node.get_public_key():
                     continue
                 try:
                     requests.post(
@@ -131,10 +132,10 @@ def connect_node():
     for nodeInfo in node.pub_list:
         updated_connections.append(nodeInfo.to_JSON())
 
-    app.logger.error(f"updated_connections: {updated_connections}")
+    app.logger.info(f"updated_connections: {updated_connections}")
 
     for nodeInfo in node.pub_list:
-        if nodeInfo.public_key_hex == node.get_public_key():
+        if nodeInfo.public_key == node.get_public_key():
             continue
         try:
             requests.post(
@@ -153,21 +154,21 @@ def connect_node():
 @app.route("/update-pub-list", methods=['POST'])
 def update_pub_list():
     current_connections_list = request.get_json()  # json.loads(request.form)
-    app.logger.error(f"current_connections_list: {current_connections_list}")
+    app.logger.info(f"current_connections_list: {current_connections_list}")
 
     update_nodes = []
     for connection in current_connections_list:
         # rewrite existing (and valid) connections
         should_skip = False
         for nodeInfo in node.pub_list:
-            if (nodeInfo.address == connection['address'] and nodeInfo.public_key_hex == connection['public_key']):
+            if (nodeInfo.address == connection['address'] and nodeInfo.public_key == connection['public_key']):
                 update_nodes.append(nodeInfo)
                 should_skip = True
                 break
         if should_skip:
             continue
 
-        app.logger.error(f"new connection: {str(connection)}")
+        app.logger.info(f"new connection: {str(connection)}")
 
         # check if we need to update existing item from our list (because its public key changed)
         ip_found_idx = -1
@@ -178,7 +179,7 @@ def update_pub_list():
 
         nodeInfo = NodeInfo(connection['address'], connection['public_key'])
         # need to update public_key for specific ip address
-        if ip_found_idx != -1 and node.pub_list[ip_found_idx].public_key_hex != connection['public_key']:
+        if ip_found_idx != -1 and node.pub_list[ip_found_idx].public_key != connection['public_key']:
             update_nodes.append(nodeInfo)
             continue
 

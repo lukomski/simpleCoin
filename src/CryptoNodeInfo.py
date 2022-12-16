@@ -1,14 +1,14 @@
 class NodeInfo:
     address: str
 
-    public_key_hex = None
+    public_key = None
 
-    def __init__(self, address: str, public_key_hex: str):
+    def __init__(self, address: str, public_key: str):
         self.address = address
-        self.public_key_hex = public_key_hex
+        self.public_key = public_key
 
     def to_JSON(self):
         return {
             "address": self.address,
-            "public_key": self.public_key_hex
+            "public_key": self.public_key
         }

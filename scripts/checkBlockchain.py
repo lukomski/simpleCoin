@@ -1,18 +1,17 @@
 import requests
-nodes = [
-    {
-        'id': 'node0',
-        'url': "http://localhost:5000/blocks"
-    },
-    {
-        'id': 'node1',
-        'url': "http://localhost:5001/blocks"
-    },
-    {
-        'id': 'node2',
-        'url': "http://localhost:5002/blocks"
-    }
-]
+import json
+response = requests.request(
+    "GET", 'http://localhost:5000/nodes', headers={}, data={})
+fetched_nodes = response.json()
+nodes = [{
+    'id': f'node{idx}',
+    'internal_url': fetched_nodes[idx]['address'],
+    'url': f'http://localhost:500{idx}',
+    'public_key': fetched_nodes[idx]['public_key']
+} for idx in range(len(fetched_nodes))]
+
+# print('nodes:', json.dumps(nodes, indent=1))
+
 payload = {}
 headers = {}
 responses = {}
@@ -20,7 +19,7 @@ responses = {}
 for node in nodes:
     id = node['id']
     responses[id] = requests.request(
-        "GET", node['url'], headers=headers, data=payload)
+        "GET", f"{node['url']}/blocks", headers=headers, data=payload)
 
 for node in nodes:
     print(node['id'], end=' ')
@@ -33,5 +32,5 @@ for node in nodes:
             continue
         other_node_text = responses[other_node['id']].text
         if node_text != other_node_text:
-            print(other_node['id'])
+            print(other_node['id'], end=', ')
     print()

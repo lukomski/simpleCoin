@@ -2,31 +2,20 @@ import requests
 import json
 import time
 
+response = requests.request(
+    "GET", 'http://localhost:5000/nodes', headers={}, data={})
+fetched_nodes = response.json()
 nodes = [
     {
-        'id': 'node0',
-        'url': "http://localhost:5000",
+        'id': f'node{idx}',
+        'url': f'http://localhost:500{idx}',
         'payloads': [],
         'pub_key': None,
         'ignore': False
-    },
-    {
-        'id': 'node1',
-        'url': "http://localhost:5001",
-        'payloads': [],
-        'pub_key': None,
-        'ignore': False
-    },
-    {
-        'id': 'node2',
-        'url': "http://localhost:5002",
-        'payloads': [],
-        'pub_key': None,
-        'ignore': True
     }
-]
+    for idx in range(len(fetched_nodes))]
 
-TIMEOUT = 8
+TIMEOUT = 2
 
 headers = {
     'Content-Type': 'application/json'
@@ -50,31 +39,29 @@ nodes[0]['payloads'] = [
         "receiver": nodes[1]['pub_key']
     }
 ]
-if not nodes[1]['ignore']:
-    nodes[1]['payloads'] = []
-    # [
-    #     {
-    #         "message": "Some transaction message 2",
-    #         "amount": 3,
-    #         "sender": nodes[1]['pub_key'],
-    #         "receiver": nodes[2]['pub_key']
-    #     }
-    # ]
-if not nodes[2]['ignore']:
-    nodes[2]['payloads'] = [
-        {
-            "message": "Some transaction message 3",
-            "amount": 1,
-            "sender": nodes[2]['pub_key'],
-            "receiver": nodes[0]['pub_key']
-        },
-        {
-            "message": "Some transaction message 3",
-            "amount": 1,
-            "sender": nodes[2]['pub_key'],
-            "receiver": nodes[1]['pub_key']
-        }
-    ]
+nodes[1]['payloads'] = []
+[
+    {
+        "message": "Some transaction message 2",
+        "amount": 3,
+        "sender": nodes[1]['pub_key'],
+        "receiver": nodes[2]['pub_key']
+    }
+]
+nodes[2]['payloads'] = [
+    {
+        "message": "Some transaction message 3",
+        "amount": 1,
+        "sender": nodes[2]['pub_key'],
+        "receiver": nodes[0]['pub_key']
+    },
+    {
+        "message": "Some transaction message 3",
+        "amount": 1,
+        "sender": nodes[2]['pub_key'],
+        "receiver": nodes[1]['pub_key']
+    }
+]
 
 
 for node in nodes:

@@ -29,6 +29,9 @@ class BlockChain:
             blocks.append(block.to_json())
         return blocks
 
+    def get_length(self):
+        return len(self._blocks)
+
     def validate_candidate_block(self, candidate_block: Block) -> bool:
         last_block_hash = self._blocks[-1].get_block_hash()
         prev_block_hash_in_candidate = candidate_block.get_prev_hash()

@@ -83,12 +83,15 @@ class Digger():
             ))
 
             counter = 0
-            while self.__is_waiting:
+            while self.__is_waiting and not self.__is_terminated:
                 time.sleep(0.001)
                 if counter % 1000 == 0:
                     self.__logger.info(
                         "Waiting another second for processing candidate block")
                 counter += 1
+
+            if self.__is_terminated:
+                continue
 
             if candidate_block.get_prev_hash() != self.__blockchain._blocks[-1].get_block_hash():
                 continue
