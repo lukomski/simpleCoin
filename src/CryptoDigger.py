@@ -1,4 +1,3 @@
-import hashlib
 from CryptoBlock import Block
 from CryptoBlockchain import BlockChain
 import threading
@@ -7,7 +6,6 @@ from CryptoTransactionPool import TransactionPool, Transaction
 from CryptoKeyManager import KeyManager
 import time
 from logging import Logger
-import requests
 from datetime import datetime
 from CryptoInput import Input
 

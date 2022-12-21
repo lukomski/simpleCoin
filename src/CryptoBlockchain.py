@@ -152,3 +152,6 @@ class BlockChain:
                 continue
             blocks.append(block)
         return blocks
+
+    def get_blocks(self) -> list[Block]:
+        return self._blocks

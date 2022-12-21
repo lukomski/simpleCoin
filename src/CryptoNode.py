@@ -19,6 +19,7 @@ from CryptoDigger import Digger
 import json
 import math
 from CryptoOutput import Output
+from CryptoBlockchainTree import BlockchainTree
 BLOCKCHAIN_FILE_PATH = "blockchain.json"
 OK = 200
 BAD_REQUEST = 400
@@ -326,3 +327,12 @@ class Node():
                 'summary_balance': mining_inputs * Digger.get_block_price_amount()
             }
         }
+
+    def get_blockchain_tree_struct(self):
+        all_blocks = self.__digger.get_blockchain().get_blocks()
+        genesis_block = all_blocks[0]
+        blockchain_tree = BlockchainTree(
+            genesis_block=genesis_block, logger=self.__logger)
+        for block in all_blocks[1:]:
+            blockchain_tree.add_block(block)
+        return blockchain_tree.to_tree_structure()

@@ -1,0 +1,42 @@
+<html>
+  <head>
+    <script
+      type="text/javascript"
+      src="https://www.gstatic.com/charts/loader.js"
+    ></script>
+    <script type="text/javascript">
+      google.charts.load("current", { packages: ["orgchart"] });
+      google.charts.setOnLoadCallback(drawChart);
+
+      function drawChart() {
+        const data = new google.visualization.DataTable();
+        data.addColumn("string", "Name");
+        data.addColumn("string", "Manager");
+        data.addColumn("string", "ToolTip");
+
+        const rows = JSON.parse('{{ tree_struct|safe }}');
+        const rowsToAdd = rows.map(row => {
+          const name = {
+            v: row.name,
+            f: `<div>
+                  <pre style="text-align: left">${JSON.stringify(row.body, null, 2)}</pre>
+                  <div style="color:red; font-style:italic">${row.message}</div>
+                </div>`
+          }
+          return [name, row.manager, row.toolTip]
+        })
+        data.addRows(rowsToAdd);
+
+        // Create the chart.
+        const chart = new google.visualization.OrgChart(
+          document.getElementById("chart_div")
+        );
+        // Draw the chart, setting the allowHtml option to true for the tooltips.
+        chart.draw(data, { allowHtml: true });
+      }
+    </script>
+  </head>
+  <body>
+    <div id="chart_div"></div>
+  </body>
+</html>

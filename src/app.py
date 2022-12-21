@@ -5,6 +5,7 @@ from logging.config import dictConfig
 
 import requests
 from CryptoNode import Node
+import json
 
 dictConfig({
     'version': 1,
@@ -39,6 +40,12 @@ app.node = node
 @app.route('/')
 def hello_geek():
     return render_template('home.html')
+
+
+@app.route('/blocks:tree')
+def visualize():
+    tree_struct = app.node.get_blockchain_tree_struct()
+    return render_template('graph.html', tree_struct=json.dumps(tree_struct))
 
 
 @app.route('/nodes')
