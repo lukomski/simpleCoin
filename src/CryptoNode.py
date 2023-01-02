@@ -19,13 +19,12 @@ from CryptoDigger import Digger
 import json
 import math
 from CryptoOutput import Output
-from CryptoBlockchainTree import BlockchainTree
+import os
 BLOCKCHAIN_FILE_PATH = "blockchain.json"
 OK = 200
 BAD_REQUEST = 400
 
 TRANSACTION_FEE_SHARE = 0.01
-
 
 class Node():
     __message_utils = None
@@ -39,7 +38,7 @@ class Node():
 
     def __setup(self, network_node_address):
         self.__logger.error('Node::__setup')
-        blockchain = None
+        blocks = []
 
         if network_node_address is not None:
             self.pub_list = []
@@ -69,23 +68,19 @@ class Node():
                         f'Parent block list is empty - try again to get block list')
             self.__logger.info(
                 f'Get block list: {block_list}')
-            block_list = Block.load_list(block_list)
-            blockchain = BlockChain.create_blockchain(block_list)
+            blocks = Block.load_list(block_list)
         else:
             self.pub_list = [
                 NodeInfo(f"{socket.gethostbyname(socket.gethostname())}:5000",
                          self.__key_manager.public_key)
             ]
             if os.path.exists(BLOCKCHAIN_FILE_PATH):
-                blockchain = BlockChain.load_blockchain(BLOCKCHAIN_FILE_PATH)
-                if blockchain is None:
+                blocks = Block.load_blocks(BLOCKCHAIN_FILE_PATH)
+                if blocks is None:
                     raise ValueError(
-                        "Could not load/parse existing blockchain - remove file or correct it to start node.")
-            else:
-                blockchain = BlockChain(None)
+                        "Could not load/parse existing blocks - remove file or correct it to start node.")
 
-        self.__digger = Digger(
-            blockchain, self.__key_manager, self.__logger, self.spread_candidate_block)
+        self.__digger = Digger(blocks, self.__key_manager, self.__logger, self.spread_candidate_block)
         self.__logger.info('Setup done')
         self.__digger.start_mining()
 
@@ -114,7 +109,6 @@ class Node():
 
     def get_public_key_by_address(self, address: str):
         for nodeInfo in self.pub_list:
-
             if (nodeInfo.address == address):
                 return nodeInfo.public_key
         return None
@@ -130,6 +124,8 @@ class Node():
             url=f"http://{address}/message", json=frame)
 
     def read_message(self, frame: dict, sender_pk_hex: str):
+        if sender_pk_hex is None:
+            self.__logger.warning(f'Sender should be str not None {str(frame)}')
         self.__message_utils.verify_message(
             frame, bytes.fromhex(sender_pk_hex))
 
@@ -146,17 +142,14 @@ class Node():
             if self.__digger == None:
                 self.__logger.warning('Not ready to get block')
                 return 'Not ready to get block', OK
-            self.__digger.pause_mining()
-            # validate block candidate
-            is_valid_block = self.__digger.get_blockchain().validate_candidate_block(block)
-            if is_valid_block:
-                self.__digger.get_blockchain().add_block(block)
-
-            self.__digger.resume_mining()
+            if not block.verify_block():
+                self.__logger.warning('Block nounce or hash_prev_nonce is wrong')
+                return 'Block nounce or hash_prev_nonce is wrong', BAD_REQUEST
+            message, is_valid_block = self.__digger.add_block(block=block)
             status = OK if is_valid_block else BAD_REQUEST
-            message = 'ok' if is_valid_block else 'Unable to validate block'
             return message, status
         else:
+            self.__logger.warning('Unhandled message type')
             return 'Unhandled message type', BAD_REQUEST
 
     def add_transaction(self, sender: str, receiver: str, amount: int, message: str):
@@ -202,67 +195,6 @@ class Node():
     def save_blockchain(self):
         self.__digger.__blockchain.save(BLOCKCHAIN_FILE_PATH)
 
-    def __compromise_block_conflict(self, nodes_that_reject: list[NodeInfo]) -> bool:
-        '''
-        Resolve adding block conflict.
-        Return True of compromised was won or False if was failed.
-        '''
-        my_address = [node for node in self.pub_list if node.public_key ==
-                      self.__key_manager.public_key][0].address
-        my_blockchain_len = self.__digger.get_blockchain().get_length()
-        winner = {
-            'address': my_address,
-            'blockchain_length': my_blockchain_len + 1
-        }
-        for idx in range(len(nodes_that_reject)):
-            node = nodes_that_reject[idx]
-            # fetch blocks
-
-            response = requests.get(
-                url=f'http://{node.address}/blocks')
-            if response.status_code == 500:
-                self.__logger.error(
-                    f'Get response status {response.status_code} from {node.address}')
-                continue
-            self.__logger.info(f'response: {response.text}')
-            block_list = response.json()
-            self.__logger.info(
-                f'Get block {len(block_list)} blocks')
-            block_list = Block.load_list(block_list)
-            blockchain = BlockChain.create_blockchain(block_list)
-            blockchain_len = blockchain.get_length()
-            if winner['blockchain_length'] < blockchain_len:
-                winner['address'] = node.address
-                winner['blockchain_length'] = blockchain_len
-            elif winner['blockchain_length'] == blockchain_len:
-                player_1_address = winner['address']
-                player_2_address = nodes_that_reject[idx].address
-                if player_1_address < player_2_address:
-                    winner['address'] = node.address
-                    winner['blockchain_length'] = blockchain_len
-        if winner['address'] != my_address:
-            winner_address = winner['address']
-            self.__logger.info(
-                'Compromise was failed - dont care, I can dig more')
-            # terminate digger
-            self.__digger.terminate_mining()
-            # fetch blocks (again) from winner - to synchronize
-            block_list = requests.get(
-                url=f'http://{winner_address}/blocks').json()
-            self.__logger.info(
-                f'Get block {len(block_list)} blocks')
-            block_list = Block.load_list(block_list)
-            blockchain = BlockChain.create_blockchain(block_list)
-            # create new digger
-            self.__digger = Digger(
-                blockchain, self.__key_manager, self.__logger, self.spread_candidate_block)
-            self.__logger.info('Start mining again')
-            self.__digger.start_mining()
-            return False
-        self.__logger.info(
-            'Compromise was won - congratulations to myself')
-        return True
-
     def spread_candidate_block(self, candidate_block: Block):
         # spread
         payload = {
@@ -270,14 +202,9 @@ class Node():
             'block': candidate_block.to_json()
         }
         frame = self.__message_utils.wrap_message(payload)
-        sender_address = self.get_address_by_public_key(
-            self.__key_manager.public_key)
-        # send to other nodes
 
         nodes_that_reject = []
         for node in self.pub_list:
-            if node.address == sender_address:
-                continue
 
             # we can be mean for some digger :)
             # We are sending new block to everone except him.
@@ -289,18 +216,6 @@ class Node():
 
             if not response.ok:
                 nodes_that_reject.append(node)
-        if len(nodes_that_reject) > 0:
-            # need to go on compromise
-            self.__logger.warning('Need to compromise')
-            is_won = self.__compromise_block_conflict(nodes_that_reject)
-            if not is_won:
-                return False
-
-        # send to myself
-        response = requests.post(
-            url=f'http://{sender_address}/message', json=frame)
-        if not response.ok:
-            return False
         return True
 
     def get_digger(self):
@@ -329,10 +244,10 @@ class Node():
         }
 
     def get_blockchain_tree_struct(self):
-        all_blocks = self.__digger.get_blockchain().get_blocks()
-        genesis_block = all_blocks[0]
-        blockchain_tree = BlockchainTree(
-            genesis_block=genesis_block, logger=self.__logger)
-        for block in all_blocks[1:]:
-            blockchain_tree.add_block(block)
-        return blockchain_tree.to_tree_structure()
+        blockchain_tree = self.__digger.get_blockchain_tree()
+        tree_structure = blockchain_tree.to_tree_structure()
+        tree_structure = [  {**element,
+                            'miner_name': f'Node {int(str(self.get_address_by_public_key(element["miner_pub_key"]))[-6])-2}'
+                            } for element in tree_structure
+                         ]
+        return tree_structure

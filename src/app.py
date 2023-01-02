@@ -58,7 +58,10 @@ def get_nodes():
 
 @app.route('/blocks')
 def get_blocks():
-    return node.get_digger().get_blockchain().to_json()
+    blocks = [block.to_json() for block in node.get_digger().get_all_blocks()]
+    if blocks is None:
+        return [], 500
+    return blocks
 
 
 @app.route('/public-key')

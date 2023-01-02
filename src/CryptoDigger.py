@@ -4,6 +4,7 @@ import threading
 import os
 from CryptoTransactionPool import TransactionPool, Transaction
 from CryptoKeyManager import KeyManager
+from CryptoBlockchainPool import BlockchainPool
 import time
 from logging import Logger
 from datetime import datetime
@@ -18,7 +19,7 @@ BLOCK_PRICE_AMOUNT = 5
 class Digger():
     __is_waiting: bool = None
     __is_terminated: bool = None
-    __blockchain: BlockChain = None
+    __blockchain_pool: BlockchainPool = None
     __worker = None
     __transaction_pool: TransactionPool = None
     __key_manager: KeyManager = None
@@ -26,14 +27,14 @@ class Digger():
 
     __spread_candidate_block_function = None
 
-    def __init__(self, blockchain: BlockChain, key_manager: KeyManager, logger: Logger, spread_block_function):
+    def __init__(self, blocks: list[Block], key_manager: KeyManager, logger: Logger, spread_block_function):
         self.__is_waiting = False
         self.__is_terminated = False
-        self.__blockchain = blockchain
         self.__transaction_pool = TransactionPool()
         self.__key_manager = key_manager
         self.__logger = logger
         self.__spread_candidate_block_function = spread_block_function
+        self.__blockchain_pool = BlockchainPool.create_blockchain_pool(blocks=blocks, logger=self.__logger)
 
     def start_mining(self) -> None:
         self.__is_waiting = False
@@ -41,18 +42,18 @@ class Digger():
         self.__worker.start()
 
     def __w_start(self) -> None:
-        if len(self.__blockchain._blocks) == 0:
+        if len(self.__blockchain_pool.get_all_blocks()) == 0:
             initial_prev_hash_hex = None  # uuid.uuid4().hex
             body = {'message': 'Initial block'}
-            generic_block = Block(initial_prev_hash_hex,
+            genesis_block = Block(initial_prev_hash_hex,
                                   body, self.__key_manager.public_key)
 
-            (nonce, is_successfull) = self.__proof_of_work(generic_block)
-            generic_block.set_nonce(nonce)
+            (nonce, is_successfull) = self.__proof_of_work(genesis_block)
+            genesis_block.set_nonce(nonce)
             # calculate hash from prev_block_hash value + nonce to keep consistency in blockchain
-            generic_block.set_prev_hash_nonce(generic_block.calculate_hash_prev_block_nonce(
-            ))
-            self.__blockchain.add_block(generic_block)
+            genesis_block.set_prev_hash_nonce(genesis_block.calculate_hash_prev_block_nonce())
+            self.__blockchain_pool.add_block(genesis_block)
+            self.__logger.info('Created blockchain_Tree')
 
         while not self.__is_terminated:
             transaction_data = self.__transaction_pool.get_next_transaction_json()
@@ -62,7 +63,7 @@ class Digger():
 
             begin = datetime.now()
 
-            candidate_block = Block(self.__blockchain._blocks[-1].get_block_hash(),
+            candidate_block = Block(self.__blockchain_pool.get_blockchain().get_blocks()[-1].get_block_hash(),
                                     block_data,
                                     self.__key_manager.public_key)
 
@@ -73,12 +74,12 @@ class Digger():
             self.__logger.info(f'Mining duration: {diff.total_seconds()} sec.')
 
             if not is_successfull:
+                self.__logger.warning('Proof of work unsuccessfull')
                 continue
 
             candidate_block.set_nonce(nonce)
             # calculate hash from prev_block_hash value + nonce to keep consistency in blockchain
-            candidate_block.set_prev_hash_nonce(candidate_block.calculate_hash_prev_block_nonce(
-            ))
+            candidate_block.set_prev_hash_nonce(candidate_block.calculate_hash_prev_block_nonce())
 
             counter = 0
             while self.__is_waiting and not self.__is_terminated:
@@ -89,13 +90,14 @@ class Digger():
                 counter += 1
 
             if self.__is_terminated:
+                self.__logger.warning('Is terminated')
                 continue
 
-            if candidate_block.get_prev_hash() != self.__blockchain._blocks[-1].get_block_hash():
+            if candidate_block.get_prev_hash() != self.__blockchain_pool.get_blockchain().get_blocks()[-1].get_block_hash():
+                self.__logger.warning('Not actual last block')
                 continue
 
-            propagated_successfully = self.__propagate_candidate_block(
-                candidate_block)
+            propagated_successfully = self.__propagate_candidate_block(candidate_block)
             if propagated_successfully and transaction_data is not None:
                 if transaction_data is not None and 'message' in transaction_data and 'Some transaction' in transaction_data['message']:
                     self.__logger.info(
@@ -131,8 +133,9 @@ class Digger():
         # calculate the difficulty target
         for nonce in range(max_nonce):  # check all possible nonce values
             # there was added new block to blockchain during mining
-            if len(self.__blockchain._blocks) > 0:
-                if block.get_prev_hash() != self.__blockchain._blocks[-1].get_block_hash():
+            blockchain = self.__blockchain_pool.get_blockchain()
+            if blockchain is not None and len(blockchain.get_blocks()) > 0:
+                if block.get_prev_hash() != blockchain.get_blocks()[-1].get_block_hash():
                     return (nonce, False)
 
             if block.verify_nonce(nonce):  # verify specific nonce value
@@ -143,13 +146,16 @@ class Digger():
         print(f'Failed after {nonce} tries')
         return (nonce, False)
 
-    def get_blockchain(self):
-        return self.__blockchain
+    def get_all_blocks(self):
+        return self.__blockchain_pool.get_all_blocks()
+    
+    def get_blockchain_tree(self):
+        return self.__blockchain_pool.get_blockchain_tree()
 
     def get_inputs(self, target_owner: str) -> list[Input]:
         self.__logger.info(f'get_inputs for owner: "{target_owner}"')
-        all_transactions = self.__blockchain.get_transactions()
-        mined_blocks = len(self.__blockchain.get_mined_blocks(target_owner))
+        all_transactions = self.__blockchain_pool.get_blockchain().get_transactions()
+        mined_blocks = len(self.__blockchain_pool.get_blockchain().get_mined_blocks(target_owner))
         self.__logger.info(
             f'mined_blocks: found {mined_blocks} mined_blocks')
         self.__logger.info(f'Found all_transactions: {len(all_transactions)}')
@@ -199,6 +205,10 @@ class Digger():
                               owner=target_owner, amount=BLOCK_PRICE_AMOUNT)
             inputs.append(new_input)
         return inputs
+    
+    def add_block(self, block: Block) -> tuple[str, bool]:
+        self.__blockchain_pool.add_block(block=block)
+        return 'Ok', True
 
     @staticmethod
     def get_block_price_id():

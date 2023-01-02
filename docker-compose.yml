@@ -40,7 +40,11 @@ services:
     environment:
       SECRET_KEY: 90909130e38d091706b8c89da7be2e946539951695678a3f917d792a437eb321
       REFERENCE_ADDRESS: 172.18.0.2:5000
-      # IGNORE_ADDRESS: 172.18.0.2:5000
+      IGNORE_ADDRESS: 172.18.0.2:5000
 networks:
   scnetwork:
     name: scnetwork
+    ipam:
+      config:
+        - subnet: 172.18.0.0/16
+          gateway: 172.18.0.1

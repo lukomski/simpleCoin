@@ -1,6 +1,7 @@
 from CryptoUtils import get_order_directory_recursively
 from CryptoTransactionPool import Transaction
 import hashlib
+import json
 
 difficulty_bits = 16    # 0 to 24 bits
 target = 2 ** (256 - difficulty_bits)
@@ -173,3 +174,15 @@ class Block:
 
     def get_miner(self) -> str:
         return self.__header['miner_pub_key']
+    
+    @staticmethod
+    def load_blocks(filename: str):
+        try:
+            with open(filename, "r") as f:
+                file_content = f.read()
+                parsed_blockchain = json.loads(file_content)
+                return Block.load_list(parsed_blockchain)
+        except FileNotFoundError:
+            return None
+        except ValueError:
+            return None

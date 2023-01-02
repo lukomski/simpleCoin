@@ -17,6 +17,13 @@ Aby sieć waluty istniała musi być uruchomiony co najmniej jeden węzeł. Aby 
 ```
 docker-compose up --build
 ```
+czasami należy poprzedzić powyższe polecenie:
+```
+docker network rm $(docker network ls -q)
+```
+
+## Wyświetlenie drzewa bloków
+http://localhost:5000/blocks:tree
 
 ## Dodanie kolejnego węzła
 
