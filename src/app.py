@@ -7,6 +7,7 @@ import requests
 from CryptoNode import Node, OK, BAD_REQUEST
 import json
 from CryptoTransaction import Transaction
+import random
 
 dictConfig({
     'version': 1,
@@ -32,20 +33,28 @@ ignore_address = os.environ.get("IGNORE_ADDRESS", None)
 if secret_key == None:
     raise AssertionError('Need SECRET_KEY defined to store keys in secure way')
 
+def fetch_probability_value_from_env_vars(var_name):
+    env_var_value = os.environ.get(var_name, None)
+    if env_var_value is None:
+        raise ValueError(f"Required '{var_name}' environment variable was not specified - correct it and try again")
+    try:
+        env_var_value = float(env_var_value)
+    except Exception:
+        raise ValueError(f"Provided '{var_name}' parameter must be float number - correct it and try again")
+    if env_var_value > 1.0 or env_var_value < 0.0:
+        raise ValueError(f"Provided '{var_name}' value is out of allowed range. It must be value between [0, 1]")
+    return env_var_value
+
 # fetch block accept probability from environment variables
-BLOCK_ACCEPT_PROBABILITY = os.environ.get("CANDIDATE_BLOCK_ACCEPT_CHANCE", None)
-if BLOCK_ACCEPT_PROBABILITY is None:
-    raise ValueError("Required 'BLOCK_ACCEPT_PROBABILITY' environment variable was not specified - correct it and try again")
+BLOCK_ACCEPT_PROBABILITY = fetch_probability_value_from_env_vars("CANDIDATE_BLOCK_ACCEPT_CHANCE")
+# fetch transaction accept probability from environment variables
+TRANSACTION_RECEIVE_CHANCE = fetch_probability_value_from_env_vars("TRANSACTION_ACCEPT_CHANCE")
 
-try:
-    BLOCK_ACCEPT_PROBABILITY = float(BLOCK_ACCEPT_PROBABILITY)
-except Exception:
-    raise ValueError("Provided 'BLOCK_ACCEPT_PROBABILITY' parameter must be float number - correct it and try again")
-
-if BLOCK_ACCEPT_PROBABILITY > 1.0 or BLOCK_ACCEPT_PROBABILITY < 0.0:
-    raise ValueError("Provided 'BLOCK_ACCEPT_PROBABILITY' value is out of allowed range. It must be value between [0, 1]")
-
-node = Node(reference_address, secret_key, app, ignore_address=ignore_address, block_accept_probability=BLOCK_ACCEPT_PROBABILITY)
+node = Node(reference_address,
+            secret_key, app,
+            ignore_address=ignore_address,
+            block_accept_probability=BLOCK_ACCEPT_PROBABILITY,
+            transaction_process_chance=TRANSACTION_RECEIVE_CHANCE)
 print(node.pub_list)
 
 app.node = node
@@ -252,14 +261,10 @@ def send_message():
 
 @app.route('/transaction', methods=['POST'])
 def create_next_transaction():
+    # get transaction data
     data = request.get_json()
-    message, is_valid = Transaction.is_transaction_request_valid(data, logger=app.logger)
-
-    if not is_valid:
-        return message, BAD_REQUEST
-
-    message, status = node.add_transaction(
-        sender=data['sender'], receiver=data['receiver'], message=data['message'], amount=data['amount'])
+    # propagate transaction to other nodes
+    message, status = node.propagate_transaction(data)
     return message, status
 
 
@@ -273,6 +278,7 @@ def save_blockchain_to_file():
 def read_message():
     request_addr = f"{request.remote_addr}:5000"
     object = request.get_json()
+
 
     sender_pkey_hex = node.get_public_key_by_address(request_addr)
 

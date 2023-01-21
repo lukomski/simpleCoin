@@ -39,6 +39,7 @@ class Node():
     __digger: Digger = None
 
     __block_accept_probability: float = None
+    __transaction_process_chance: float = None
 
     def __setup(self, network_node_address):
         self.__logger.error('Node::__setup')
@@ -88,13 +89,14 @@ class Node():
         self.__logger.info('Setup done')
         self.__digger.start_mining()
 
-    def __init__(self, network_node_address, secret_key, app, ignore_address: str = None, block_accept_probability: float = 1.0):
+    def __init__(self, network_node_address, secret_key, app, ignore_address: str = None, block_accept_probability: float = 1.0, transaction_process_chance: float = 1.0):
         self.__key_manager = KeyManager(app.logger, secret_key)
         self.__ignore_address = ignore_address
         self.app = app
         self.__logger = app.logger
         self.__message_utils = MessageUtils(self.__key_manager)
         self.__block_accept_probability = block_accept_probability
+        self.__transaction_process_chance = transaction_process_chance
 
         setup_thread = Thread(target=self.__setup,
                               args=(network_node_address,))
@@ -162,11 +164,33 @@ class Node():
             else:
                 self.__logger.info("Received candidate block will be ignored")
                 return "Candidate block ignored", BAD_REQUEST
+        elif payload['type'] == 'new_transaction':
+            transaction_rng = random.random()
+            if transaction_rng < self.__transaction_process_chance:
+                transaction_data = payload['transaction']
+
+                self.__logger.info(str(transaction_data))
+
+                message, is_valid = Transaction.is_valid(transaction_data, logger=self.__logger)
+
+                if not is_valid:
+                    self.__logger.info(f"Transaction validated... {message}")
+                    return message, BAD_REQUEST
+
+                # add restored transaction
+                restored_transaction = Transaction.create_from_json(transaction_data)
+                self.__digger.add_transaction(restored_transaction)
+
+                self.__logger.info(message)
+                return message, OK
+            else:
+                self.__logger.info("Transaction ignored")
+                return "Transaction ignored", BAD_REQUEST
         else:
             self.__logger.warning('Unhandled message type')
             return 'Unhandled message type', BAD_REQUEST
 
-    def add_transaction(self, sender: str, receiver: str, amount: int, message: str):
+    def calculate_transaction_data(self, sender: str, receiver: str, amount: int, message: str):
         transaction_id = str(uuid.uuid4())
         transaction_fee = math.ceil(amount * TRANSACTION_FEE_SHARE)
         valid_inputs = self.__digger.get_inputs(sender)
@@ -178,7 +202,7 @@ class Node():
 
         spend_amount = transaction_fee + amount
         if available_balance < spend_amount:
-            return f'Not enough account balance need {spend_amount} but has {available_balance}', BAD_REQUEST
+            return f'Not enough account balance need {spend_amount} but has {available_balance}', BAD_REQUEST, None
 
         outputs = [
             Output(owner=receiver, amount=amount),
@@ -187,17 +211,35 @@ class Node():
         if change_amount > 0:
             outputs.append(Output(owner=sender, amount=change_amount))
 
+        self.__logger.info("Transaction data calculated...")
+
+        return_data = {
+            'transaction_id': transaction_id,
+            'transaction_fee': transaction_fee,
+            'valid_inputs': valid_inputs,
+            'outputs': outputs,
+        }
+
+        return "ok", OK, return_data
+
+    def add_transaction(self, sender: str, receiver: str, amount: int, message: str):
+        msg, status, calculated_transaction_data = self.calculate_transaction_data(sender, receiver, amount, message)
+
+        if status == BAD_REQUEST:
+            return msg, status
+
         transaction, message, is_valid = Transaction.create_transaction(
             key_manager = self.__key_manager,
             logger = self.__logger,
-            transaction_id = transaction_id,
-            transaction_fee = transaction_fee,
-            inputs = valid_inputs,
-            outputs = outputs,
+            transaction_id = calculated_transaction_data['transaction_id'],
+            transaction_fee = calculated_transaction_data['transaction_fee'],
+            inputs = calculated_transaction_data['valid_inputs'],
+            outputs = calculated_transaction_data['outputs'],
             message = message
         )
 
         if not is_valid:
+            self.__logger.info(message)
             return f'Invalid transaction: {message}', BAD_REQUEST
 
         self.__digger.add_transaction(transaction)
@@ -262,3 +304,48 @@ class Node():
                             } for element in tree_structure
                          ]
         return tree_structure
+
+    def propagate_transaction(self, transaction_data: dict):
+        message, is_valid = Transaction.is_transaction_request_valid(transaction_data, self.__logger)
+        if not is_valid:
+            self.__logger.info(message)
+            return message, BAD_REQUEST
+
+        msg, status, calculated_transaction_data = self.calculate_transaction_data(
+            sender = transaction_data['sender'],
+            receiver = transaction_data['receiver'],
+            amount = transaction_data['amount'],
+            message = transaction_data['message']
+        )
+        # could not calculate transaction data
+        if status == BAD_REQUEST:
+            self.__logger.info(msg)
+            return msg, status
+
+        transaction, msg, is_valid = Transaction.create_transaction(
+            key_manager = self.__key_manager,
+            logger = self.__logger,
+            transaction_id = calculated_transaction_data['transaction_id'],
+            transaction_fee = calculated_transaction_data['transaction_fee'],
+            inputs = calculated_transaction_data['valid_inputs'],
+            outputs = calculated_transaction_data['outputs'],
+            message = transaction_data['message']
+        )
+        if not is_valid:
+            self.__logger.info(msg)
+            return f'Invalid transaction: {msg}', BAD_REQUEST
+
+        self.__logger.info("Attempting to broadcast transaction...")
+
+        transaction_payload = {
+            'type': 'new_transaction',
+            'transaction': transaction.to_json()
+        }
+        transaction_frame = self.__message_utils.wrap_message(transaction_payload)
+
+        # send transaction to everyone (except that one, we're ignoring)
+        for node in self.pub_list:
+            if node.address == self.__ignore_address:
+                continue
+            requests.post(url=f"http://{node.address}/message", json=transaction_frame)
+        return "ok", OK
