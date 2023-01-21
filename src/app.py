@@ -32,7 +32,20 @@ ignore_address = os.environ.get("IGNORE_ADDRESS", None)
 if secret_key == None:
     raise AssertionError('Need SECRET_KEY defined to store keys in secure way')
 
-node = Node(reference_address, secret_key, app, ignore_address=ignore_address)
+# fetch block accept probability from environment variables
+BLOCK_ACCEPT_PROBABILITY = os.environ.get("CANDIDATE_BLOCK_ACCEPT_CHANCE", None)
+if BLOCK_ACCEPT_PROBABILITY is None:
+    raise ValueError("Required 'BLOCK_ACCEPT_PROBABILITY' environment variable was not specified - correct it and try again")
+
+try:
+    BLOCK_ACCEPT_PROBABILITY = float(BLOCK_ACCEPT_PROBABILITY)
+except Exception:
+    raise ValueError("Provided 'BLOCK_ACCEPT_PROBABILITY' parameter must be float number - correct it and try again")
+
+if BLOCK_ACCEPT_PROBABILITY > 1.0 or BLOCK_ACCEPT_PROBABILITY < 0.0:
+    raise ValueError("Provided 'BLOCK_ACCEPT_PROBABILITY' value is out of allowed range. It must be value between [0, 1]")
+
+node = Node(reference_address, secret_key, app, ignore_address=ignore_address, block_accept_probability=BLOCK_ACCEPT_PROBABILITY)
 print(node.pub_list)
 
 app.node = node

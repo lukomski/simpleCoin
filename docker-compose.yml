@@ -16,6 +16,7 @@ services:
       # import nacl.secret
       # nacl.utils.random(nacl.secret.SecretBox.KEY_SIZE).hex()
       SECRET_KEY: 07f83cd2a279a2edc6b7ae1ced2cef4d325490efb2d2194813d7b446155d0c64
+      CANDIDATE_BLOCK_ACCEPT_CHANCE: 0.8
   node1:
     build: .
     container_name: sc_node1
@@ -28,6 +29,7 @@ services:
     environment:
       SECRET_KEY: ee7e58b69fca387a17dd8b7761c1ad3eb0a93808165f986c6edbbb194acdff4b
       REFERENCE_ADDRESS: 172.18.0.2:5000
+      CANDIDATE_BLOCK_ACCEPT_CHANCE: 0.8
   node2:
     build: .
     container_name: sc_node2
@@ -41,6 +43,7 @@ services:
       SECRET_KEY: 90909130e38d091706b8c89da7be2e946539951695678a3f917d792a437eb321
       REFERENCE_ADDRESS: 172.18.0.2:5000
       IGNORE_ADDRESS: 172.18.0.2:5000
+      CANDIDATE_BLOCK_ACCEPT_CHANCE: 0.8
 networks:
   scnetwork:
     name: scnetwork

@@ -20,6 +20,8 @@ import json
 import math
 from CryptoOutput import Output
 import os
+import random
+
 BLOCKCHAIN_FILE_PATH = "blockchain.json"
 OK = 200
 BAD_REQUEST = 400
@@ -35,6 +37,8 @@ class Node():
     port = None
     app = None
     __digger: Digger = None
+
+    __block_accept_probability: float = None
 
     def __setup(self, network_node_address):
         self.__logger.error('Node::__setup')
@@ -84,12 +88,13 @@ class Node():
         self.__logger.info('Setup done')
         self.__digger.start_mining()
 
-    def __init__(self, network_node_address, secret_key, app, ignore_address: str = None):
+    def __init__(self, network_node_address, secret_key, app, ignore_address: str = None, block_accept_probability: float = 1.0):
         self.__key_manager = KeyManager(app.logger, secret_key)
         self.__ignore_address = ignore_address
         self.app = app
         self.__logger = app.logger
         self.__message_utils = MessageUtils(self.__key_manager)
+        self.__block_accept_probability = block_accept_probability
 
         setup_thread = Thread(target=self.__setup,
                               args=(network_node_address,))
@@ -138,17 +143,25 @@ class Node():
                 "message": message
             }
         elif payload['type'] == 'new_block':
-            block = Block.load(payload['block'])
-            if self.__digger == None:
-                self.__logger.warning('Not ready to get block')
-                return 'Not ready to get block', OK
-            if not block.verify_block():
-                self.__logger.warning('Block nounce or hash_prev_nonce is wrong')
-                return 'Block nounce or hash_prev_nonce is wrong', BAD_REQUEST
-            message, is_valid_block = self.__digger.add_block(block=block)
+            # decide whether candidate block should be processed or not
+            block_rng = random.random()
+            # candidate block can be processed
+            if block_rng < self.__block_accept_probability:
+                block = Block.load(payload['block'])
+                if self.__digger == None:
+                    self.__logger.warning('Not ready to get block')
+                    return 'Not ready to get block', OK
+                if not block.verify_block():
+                    self.__logger.warning('Block nounce or hash_prev_nonce is wrong')
+                    return 'Block nounce or hash_prev_nonce is wrong', BAD_REQUEST
+                message, is_valid_block = self.__digger.add_block(block=block)
 
-            status = OK if is_valid_block else BAD_REQUEST
-            return message, status
+                status = OK if is_valid_block else BAD_REQUEST
+                return message, status
+            # candidate block will be ignored
+            else:
+                self.__logger.info("Received candidate block will be ignored")
+                return "Candidate block ignored", BAD_REQUEST
         else:
             self.__logger.warning('Unhandled message type')
             return 'Unhandled message type', BAD_REQUEST
