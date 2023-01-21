@@ -9,6 +9,7 @@ import time
 from logging import Logger
 from datetime import datetime
 from CryptoInput import Input
+from CryptoMessageUtils import MessageUtils
 
 max_nonce = 2 ** 32     # 4 billion
 
@@ -103,6 +104,7 @@ class Digger():
                     self.__logger.info(
                         f'Pop transaction {transaction_data["message"]}')
                 self.__transaction_pool.pop_next_transaction()
+        self.__logger.info("Mining terminated...")
 
     def pause_mining(self) -> None:
         self.__is_waiting = True
@@ -209,6 +211,74 @@ class Digger():
     def add_block(self, block: Block) -> tuple[str, bool]:
         self.__blockchain_pool.add_block(block=block)
         return 'Ok', True
+
+    def verify_candidate_block(self, candidate_block: Block):
+        is_valid = self.__blockchain.validate_candidate_block(candidate_block)
+        if not is_valid:
+            return False
+        
+        candidate_block_transactions = candidate_block.get_transactions()
+
+        # verify transactions in candidate block
+        for transaction in candidate_block_transactions:
+            transaction_inputs = transaction.get_inputs()
+            transaction_input_targets = []
+
+            for transaction_input in transaction_inputs:
+                if transaction_input.get_owner() not in transaction_input_targets:
+                    transaction_input_targets.append(transaction_input.get_owner())
+            
+            if len(transaction_input_targets) != 1:
+                return False
+            
+            # there is only one transaction owner
+            sender = transaction_input_targets[0]
+            target_valid_inputs = self.get_inputs(sender)
+
+            # verify non-mining-price blocks
+            for transaction_input in transaction_inputs:
+                if transaction_input.get_transaction_id() == BLOCK_PRICE_ID:
+                    continue
+                transaction_found_counter = 0
+                # previous id consistent and not doubled
+                for valid_input in target_valid_inputs:
+                    if valid_input.get_transaction_id() == transaction_input.get_transaction_id() and valid_input.get_amount() == transaction_input.get_amount():
+                        transaction_found_counter += 1
+                if transaction_found_counter != 1:
+                    return False
+            
+            # checking mining prices sums
+            transaction_input_total_amount = 0
+            for transaction_input in transaction_inputs:
+                if transaction_input.get_transaction_id() == BLOCK_PRICE_ID:
+                    transaction_input_total_amount += transaction_input.get_amount()
+
+            target_valid_input_total_amount = 0
+            for target_valid_input in target_valid_inputs:
+                if target_valid_input.get_transaction_id() == BLOCK_PRICE_ID:
+                    target_valid_input_total_amount += target_valid_input.get_amount()
+            
+            # check if sum of transaction inputs is greater than total valid inputs amount sum (price for mining)
+            if transaction_input_total_amount > target_valid_input_total_amount:
+                return False
+
+            transaction_outputs = transaction.get_outputs()
+            outputs_sum = 0
+            for transaction_output in transaction_outputs:
+                outputs_sum += transaction_output.get_amount()
+
+            # check if sum of inputs = sum of outputs + transaction fee
+            if outputs_sum + transaction.get_transaction_fee() != transaction_input_total_amount:
+                return False
+
+            # verify transaction signature
+            try:
+                MessageUtils.verifyTransactionSignature(transaction, sender)
+            except Exception as err:
+                self.__logger.info(str(err))
+                return False
+
+        return True
 
     @staticmethod
     def get_block_price_id():

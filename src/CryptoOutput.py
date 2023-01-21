@@ -24,7 +24,7 @@ class Output:
         return is_valid(config, data)
 
     def load(data: dict, logger: Logger = None):
-        _, is_valid = Output.is_valid(dict)
+        _, is_valid = Output.is_valid(data)
         if not is_valid:
             return None
         return Output(**data)

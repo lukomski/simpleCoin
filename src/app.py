@@ -4,8 +4,9 @@ import os
 from logging.config import dictConfig
 
 import requests
-from CryptoNode import Node
+from CryptoNode import Node, OK, BAD_REQUEST
 import json
+from CryptoTransaction import Transaction
 
 dictConfig({
     'version': 1,
@@ -58,7 +59,10 @@ def get_nodes():
 
 @app.route('/blocks')
 def get_blocks():
-    blocks = [block.to_json() for block in node.get_digger().get_all_blocks()]
+    blocks = None
+    if node.get_digger() is not None:
+        blocks = [block.to_json() for block in node.get_digger().get_all_blocks()]
+
     if blocks is None:
         return [], 500
     return blocks
@@ -236,6 +240,11 @@ def send_message():
 @app.route('/transaction', methods=['POST'])
 def create_next_transaction():
     data = request.get_json()
+    message, is_valid = Transaction.is_transaction_request_valid(data, logger=app.logger)
+
+    if not is_valid:
+        return message, BAD_REQUEST
+
     message, status = node.add_transaction(
         sender=data['sender'], receiver=data['receiver'], message=data['message'], amount=data['amount'])
     return message, status

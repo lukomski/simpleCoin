@@ -3,7 +3,7 @@ from CryptoTransactionPool import Transaction
 import hashlib
 import json
 
-difficulty_bits = 16    # 0 to 24 bits
+difficulty_bits = 20    # 0 to 24 bits
 target = 2 ** (256 - difficulty_bits)
 
 
@@ -162,7 +162,7 @@ class Block:
         for transaction_dict in self.__data['transactions']:
             _, valid = Transaction.is_valid(transaction_dict)
             if valid:
-                transaction = Transaction(**transaction_dict)
+                transaction = Transaction.create_from_json(transaction_dict)
                 transactions.append(transaction)
         return transactions
 

@@ -146,6 +146,7 @@ class Node():
                 self.__logger.warning('Block nounce or hash_prev_nonce is wrong')
                 return 'Block nounce or hash_prev_nonce is wrong', BAD_REQUEST
             message, is_valid_block = self.__digger.add_block(block=block)
+
             status = OK if is_valid_block else BAD_REQUEST
             return message, status
         else:
@@ -172,23 +173,20 @@ class Node():
         change_amount = available_balance - spend_amount
         if change_amount > 0:
             outputs.append(Output(owner=sender, amount=change_amount))
-        # create data without signature
-        data = {
-            'transaction_id': transaction_id,
-            'transaction_fee': transaction_fee,
-            'inputs': [input.to_json() for input in valid_inputs],
-            'outputs': [output.to_json() for output in outputs],
-            'message': message
-        }
-        signature = self.__key_manager.sign(json.dumps(data).encode('utf-8'))
-        # add signature to data
-        data = {**data, 'signature': signature}
-        message, is_valid = Transaction.is_valid(data, self.__logger)
+
+        transaction, message, is_valid = Transaction.create_transaction(
+            key_manager = self.__key_manager,
+            logger = self.__logger,
+            transaction_id = transaction_id,
+            transaction_fee = transaction_fee,
+            inputs = valid_inputs,
+            outputs = outputs,
+            message = message
+        )
+
         if not is_valid:
             return f'Invalid transaction: {message}', BAD_REQUEST
 
-        transaction = Transaction(transaction_id=data['transaction_id'], transaction_fee=data['transaction_fee'],
-                                  signature=data['signature'], inputs=data['inputs'], outputs=data['outputs'], message=data['message'])
         self.__digger.add_transaction(transaction)
         return 'ok', OK
 
