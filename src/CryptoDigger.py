@@ -5,17 +5,14 @@ import os
 from CryptoTransactionPool import TransactionPool, Transaction
 from CryptoKeyManager import KeyManager
 from CryptoBlockchainPool import BlockchainPool
+from CryptoBlockchain import BLOCK_PRICE_AMOUNT
+from CryptoInput import BLOCK_PRICE_ID
 import time
 from logging import Logger
 from datetime import datetime
 from CryptoInput import Input
-from CryptoMessageUtils import MessageUtils
 
 max_nonce = 2 ** 32     # 4 billion
-
-BLOCK_PRICE_ID = 'block_mining_price'
-BLOCK_PRICE_AMOUNT = 5
-
 
 class Digger():
     __is_waiting: bool = None
@@ -57,7 +54,9 @@ class Digger():
             self.__logger.info('Created blockchain_Tree')
 
         while not self.__is_terminated:
-            transaction_data = self.__transaction_pool.get_next_transaction_json()
+            lost_transactions = self.__blockchain_pool.get_blockchain_tree().get_lost_transactions_ready_to_apply()
+            aplied_transaction_ids = [transaction.get_transaction_id() for transaction in self.__blockchain_pool.get_blockchain().get_transactions()]
+            transaction_data = self.__transaction_pool.get_next_transaction_json(lost_transactions, aplied_transaction_ids)
             block_data = {
                 'transactions': transaction_data if transaction_data is None else [transaction_data]
             }
@@ -155,130 +154,11 @@ class Digger():
         return self.__blockchain_pool.get_blockchain_tree()
 
     def get_inputs(self, target_owner: str) -> list[Input]:
-        self.__logger.info(f'get_inputs for owner: "{target_owner}"')
-        all_transactions = self.__blockchain_pool.get_blockchain().get_transactions()
-        mined_blocks = len(self.__blockchain_pool.get_blockchain().get_mined_blocks(target_owner))
-        self.__logger.info(
-            f'mined_blocks: found {mined_blocks} mined_blocks')
-        self.__logger.info(f'Found all_transactions: {len(all_transactions)}')
-        transaction_sources = {}
-        for transaction in all_transactions:
-            inputs = transaction.get_inputs()
-            outputs = transaction.get_outputs()
-            # remove from sources used outputs
-            for input in inputs:
-                source_transaction_id = input.get_transaction_id()
-                if input.get_owner() != target_owner:
-                    continue
-                if source_transaction_id == BLOCK_PRICE_ID:
-                    if mined_blocks > 0:
-                        mined_blocks -= 1
-                    else:
-                        self.__logger(
-                            f'Input {input.to_json()} in transaction {transaction.to_json()} get block mining price which does not have')
-                    continue
-                elif source_transaction_id not in transaction_sources:
-                    self.__logger.warning(
-                        f'In transaction_sources {transaction.to_json()} input {input.to_json()} has no valid previous source')
-                    continue
-                transaction_sources.pop(source_transaction_id)
-            # add to sources outputs from block
-            transaction_id = transaction.get_transaction_id()
-            for output in outputs:
-                owner = output.get_owner()
-                if owner != target_owner:
-                    continue
-                self.__logger.info(
-                    f'Found output for owner {output.to_json()}')
-                if transaction_id in transaction_sources:
-                    self.__logger.warning(
-                        f'In transaction_sources {transaction.to_json()} output {output.to_json()} try to add the same transaction - transaction id should be unique')
-                    continue
-                self.__logger.info(
-                    f'CryptoInputs::get_inputs output: {output.to_json()} transaction_id: {transaction_id}')
-                new_input = Input.output_to_input(
-                    output, transaction_id, logger=self.__logger)
-                transaction_sources[transaction_id] = new_input
-
-        self.__logger.info(f'After mined_blocks: {mined_blocks}')
-        inputs = list(transaction_sources.values())
-        for _ in range(mined_blocks):
-            new_input = Input(transaction_id=BLOCK_PRICE_ID,
-                              owner=target_owner, amount=BLOCK_PRICE_AMOUNT)
-            inputs.append(new_input)
-        return inputs
+        return self.__blockchain_pool.get_blockchain().get_inputs(target_owner, self.__logger)
     
     def add_block(self, block: Block) -> tuple[str, bool]:
         self.__blockchain_pool.add_block(block=block)
         return 'Ok', True
-
-    def verify_candidate_block(self, candidate_block: Block):
-        is_valid = self.__blockchain.validate_candidate_block(candidate_block)
-        if not is_valid:
-            return False
-        
-        candidate_block_transactions = candidate_block.get_transactions()
-
-        # verify transactions in candidate block
-        for transaction in candidate_block_transactions:
-            transaction_inputs = transaction.get_inputs()
-            transaction_input_targets = []
-
-            for transaction_input in transaction_inputs:
-                if transaction_input.get_owner() not in transaction_input_targets:
-                    transaction_input_targets.append(transaction_input.get_owner())
-            
-            if len(transaction_input_targets) != 1:
-                return False
-            
-            # there is only one transaction owner
-            sender = transaction_input_targets[0]
-            target_valid_inputs = self.get_inputs(sender)
-
-            # verify non-mining-price blocks
-            for transaction_input in transaction_inputs:
-                if transaction_input.get_transaction_id() == BLOCK_PRICE_ID:
-                    continue
-                transaction_found_counter = 0
-                # previous id consistent and not doubled
-                for valid_input in target_valid_inputs:
-                    if valid_input.get_transaction_id() == transaction_input.get_transaction_id() and valid_input.get_amount() == transaction_input.get_amount():
-                        transaction_found_counter += 1
-                if transaction_found_counter != 1:
-                    return False
-            
-            # checking mining prices sums
-            transaction_input_total_amount = 0
-            for transaction_input in transaction_inputs:
-                if transaction_input.get_transaction_id() == BLOCK_PRICE_ID:
-                    transaction_input_total_amount += transaction_input.get_amount()
-
-            target_valid_input_total_amount = 0
-            for target_valid_input in target_valid_inputs:
-                if target_valid_input.get_transaction_id() == BLOCK_PRICE_ID:
-                    target_valid_input_total_amount += target_valid_input.get_amount()
-            
-            # check if sum of transaction inputs is greater than total valid inputs amount sum (price for mining)
-            if transaction_input_total_amount > target_valid_input_total_amount:
-                return False
-
-            transaction_outputs = transaction.get_outputs()
-            outputs_sum = 0
-            for transaction_output in transaction_outputs:
-                outputs_sum += transaction_output.get_amount()
-
-            # check if sum of inputs = sum of outputs + transaction fee
-            if outputs_sum + transaction.get_transaction_fee() != transaction_input_total_amount:
-                return False
-
-            # verify transaction signature
-            try:
-                MessageUtils.verifyTransactionSignature(transaction, sender)
-            except Exception as err:
-                self.__logger.info(str(err))
-                return False
-
-        return True
 
     @staticmethod
     def get_block_price_id():

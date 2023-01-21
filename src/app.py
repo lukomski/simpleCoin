@@ -240,13 +240,22 @@ def send_message():
 @app.route('/transaction', methods=['POST'])
 def create_next_transaction():
     data = request.get_json()
-    message, is_valid = Transaction.is_transaction_request_valid(data, logger=app.logger)
+    data_without_inputs = data.copy()
+    if 'inputs' in data_without_inputs:
+        data_without_inputs.pop('inputs')
+    inputs = data['inputs'] if 'inputs' in data else None
 
-    if not is_valid:
+    message, is_valid = Transaction.is_transaction_request_valid(data_without_inputs, logger=app.logger)
+
+    if not is_valid: 
         return message, BAD_REQUEST
 
     message, status = node.add_transaction(
-        sender=data['sender'], receiver=data['receiver'], message=data['message'], amount=data['amount'])
+        sender=data['sender'],
+        receiver=data['receiver'],
+        message=data['message'],
+        amount=data['amount'],
+        inputs = inputs)
     return message, status
 
 

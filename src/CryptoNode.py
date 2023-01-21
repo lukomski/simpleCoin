@@ -1,30 +1,24 @@
-from nacl.signing import SigningKey
-
 import socket
 import requests
 
 from CryptoNodeInfo import NodeInfo
 from CryptoMessageUtils import MessageUtils
 from CryptoBlock import Block
-from CryptoBlockchain import BlockChain
 from CryptoKeyManager import KeyManager
+from CryptoTransaction import Transaction
 from threading import Thread
+from CryptoInput import Input
 import os
-from CryptoTransactionPool import TransactionPool, Transaction
 from CryptoUtils import get_order_directory_recursively, encrypt_by_secret_key, decrypt_by_secret_key
 import uuid
 import time
-from datetime import datetime
 from CryptoDigger import Digger
-import json
-import math
 from CryptoOutput import Output
 import os
 BLOCKCHAIN_FILE_PATH = "blockchain.json"
 OK = 200
 BAD_REQUEST = 400
 
-TRANSACTION_FEE_SHARE = 0.01
 
 class Node():
     __message_utils = None
@@ -153,11 +147,23 @@ class Node():
             self.__logger.warning('Unhandled message type')
             return 'Unhandled message type', BAD_REQUEST
 
-    def add_transaction(self, sender: str, receiver: str, amount: int, message: str):
+    def add_transaction(self, sender: str, receiver: str, amount: int, message: str, inputs: dict | None = None):
+        # convert inputs to class objects
+        if inputs is not None:
+            for input in inputs:
+                msg, is_valid = Input.is_valid(input)
+                if not is_valid:
+                    return msg, BAD_REQUEST
+            inputs = [Input(**input) for input in inputs]
+
         transaction_id = str(uuid.uuid4())
-        transaction_fee = math.ceil(amount * TRANSACTION_FEE_SHARE)
+        transaction_fee = Transaction.calculate_transaction_fee(amount)
         valid_inputs = self.__digger.get_inputs(sender)
+        if inputs is not None:
+            valid_inputs = inputs         
+        
         self.__logger.info(f'valid_inputs: {len(valid_inputs)}')
+                            
 
         available_balance = 0
         for input in valid_inputs:
@@ -183,7 +189,10 @@ class Node():
             outputs = outputs,
             message = message
         )
-
+        if not is_valid:
+            return f'Invalid transaction: {message}', BAD_REQUEST
+        
+        message, is_valid = transaction.is_consistent()
         if not is_valid:
             return f'Invalid transaction: {message}', BAD_REQUEST
 

@@ -3,6 +3,7 @@ from CryptoUtils import get_order_directory_recursively, is_valid
 from CryptoOutput import Output
 from logging import Logger
 
+BLOCK_PRICE_ID = 'block_mining_price'
 
 class Input(Output):
     __transaction_id: str = None
@@ -19,6 +20,9 @@ class Input(Output):
 
     def get_transaction_id(self) -> str:
         return self.__transaction_id
+    
+    def is_block_price(self):
+        return self.__transaction_id == BLOCK_PRICE_ID
 
     @staticmethod
     def output_to_input(output: Output, transaction_id: str, logger: Logger = None):

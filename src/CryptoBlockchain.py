@@ -1,8 +1,11 @@
 from CryptoBlock import Block
 from CryptoTransaction import Transaction
+from CryptoInput import Input, BLOCK_PRICE_ID
 import json
+from logging import Logger
 
 FILE_NAME = "blockchain.json"
+BLOCK_PRICE_AMOUNT = 5
 
 
 class BlockChain:
@@ -155,3 +158,88 @@ class BlockChain:
 
     def get_blocks(self) -> list[Block]:
         return self._blocks
+    
+    def get_inputs(self, target_owner: str, logger: Logger | None = None) -> list[Input]:
+        all_transactions = self.get_transactions()
+        mined_blocks = len(self.get_mined_blocks(target_owner))
+        if logger:
+            logger.info(
+                f'mined_blocks: found {mined_blocks} mined_blocks')
+            logger.info(f'Found all_transactions: {len(all_transactions)}')
+        transaction_sources = {}
+        for transaction in all_transactions:
+            inputs = transaction.get_inputs()
+            outputs = transaction.get_outputs()
+            # remove from sources used outputs
+            for input in inputs:
+                source_transaction_id = input.get_transaction_id()
+                if input.get_owner() != target_owner:
+                    continue
+                if source_transaction_id == BLOCK_PRICE_ID:
+                    if mined_blocks > 0:
+                        mined_blocks -= 1
+                    else:
+                        if logger:
+                            logger(
+                                f'Input {input.to_json()} in transaction {transaction.to_json()} get block mining price which does not have')
+                    continue
+                elif source_transaction_id not in transaction_sources:
+                    if logger:
+                        logger.warning(
+                            f'In transaction_sources {transaction.to_json()} input {input.to_json()} has no valid previous source')
+                    continue
+                transaction_sources.pop(source_transaction_id)
+            # add to sources outputs from block
+            transaction_id = transaction.get_transaction_id()
+            for output in outputs:
+                owner = output.get_owner()
+                if owner != target_owner:
+                    continue
+                if logger:
+                    logger.info(
+                        f'Found output for owner {output.to_json()}')
+                if transaction_id in transaction_sources:
+                    if logger:
+                        logger.warning(
+                            f'In transaction_sources {transaction.to_json()} output {output.to_json()} try to add the same transaction - transaction id should be unique')
+                    continue
+                if logger:
+                    logger.info(
+                        f'CryptoInputs::get_inputs output: {output.to_json()} transaction_id: {transaction_id}')
+                new_input = Input.output_to_input(
+                    output, transaction_id, logger=logger)
+                transaction_sources[transaction_id] = new_input
+
+        if logger:
+            logger.info(f'After mined_blocks: {mined_blocks}')
+        inputs = list(transaction_sources.values())
+        for _ in range(mined_blocks):
+            new_input = Input(transaction_id=BLOCK_PRICE_ID,
+                              owner=target_owner, amount=BLOCK_PRICE_AMOUNT)
+            inputs.append(new_input)
+        return inputs
+
+    def is_valid_transaction_candidate(self, transaction: Transaction, logger: Logger | None = None) -> bool:
+        '''
+        Checks if inputs are still available.
+        '''
+        message, is_consistent = transaction.is_consistent()
+        if not is_consistent:
+            if logger:
+                logger.info(f'{message}')
+            return False
+    
+        receiver = transaction.get_receiver()
+        inputs = self.get_inputs(receiver, logger)
+        # build str of json input to compare it later
+        inputs_json_str_list = [str(input.to_json()) for input in inputs]
+        
+        for transaction_input in transaction.get_inputs():
+            transaction_input_json_str = str(transaction_input.to_json())
+            if transaction_input_json_str not in inputs_json_str_list:
+                if logger:
+                    logger.info(f'{inputs_json_str_list} not in {inputs_json_str_list}')
+                return False
+        return True
+            
+        

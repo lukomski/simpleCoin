@@ -28,12 +28,3 @@ class MessageUtils:
     def getPayload(self, frame: dict):
         return frame['payload']
 
-    @staticmethod
-    def verifyTransactionSignature(transaction: Transaction, transaction_owner_pub_key: str):
-        transaction_json_bytes = json.dumps(transaction.get_data_without_signature()).encode('utf-8')
-        signature = bytes.fromhex(transaction.get_signature())
-
-        transaction_owner_pub_key_bytes = bytes.fromhex(transaction_owner_pub_key)
-        verify_key = VerifyKey(transaction_owner_pub_key_bytes)
-        # throw error if signature is invalid
-        verify_key.verify(transaction_json_bytes, signature)
