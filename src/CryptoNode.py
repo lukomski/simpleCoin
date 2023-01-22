@@ -311,12 +311,20 @@ class Node():
         
         
         # set outputs
-        outputs = [
-            Output(owner=transaction_data['receiver'], amount=transaction_data['amount']),
-        ]
-        change_amount = available_balance - spend_amount
-        if change_amount > 0:
-            outputs.append(Output(owner=transaction_data['sender'], amount=change_amount))
+        outputs = None
+        if transaction_data['receiver'] == transaction_data['sender']:
+            # collecting inputs
+            amount = available_balance - transaction_fee
+            outputs = [
+                Output(owner=transaction_data['receiver'], amount=amount),
+            ]
+        else:
+            outputs = [
+                Output(owner=transaction_data['receiver'], amount=transaction_data['amount']),
+            ]
+            change_amount = available_balance - spend_amount
+            if change_amount > 0:
+                outputs.append(Output(owner=transaction_data['sender'], amount=change_amount))
             
         # Create transaction object
         transaction, msg, is_valid = Transaction.create_transaction(
