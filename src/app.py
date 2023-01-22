@@ -303,6 +303,12 @@ def validate_blockchain():
 def get_wallet_balance():
     return node.get_wallet_balance(), 200
 
+@app.route("/make-double-spending", methods=['POST'])
+def make_double_spending():
+    data = request.get_json()
+    message, status = node.make_double_spending(data)
+    return message, status
+
 
 if __name__ == "__main__":
     app.run(debug=True)
