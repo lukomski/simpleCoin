@@ -1,23 +1,18 @@
-from nacl.signing import SigningKey
-
 import socket
 import requests
 
 from CryptoNodeInfo import NodeInfo
 from CryptoMessageUtils import MessageUtils
 from CryptoBlock import Block
-from CryptoBlockchain import BlockChain
 from CryptoKeyManager import KeyManager
+from CryptoTransaction import Transaction
 from threading import Thread
+from CryptoInput import Input
 import os
-from CryptoTransactionPool import TransactionPool, Transaction
 from CryptoUtils import get_order_directory_recursively, encrypt_by_secret_key, decrypt_by_secret_key
 import uuid
 import time
-from datetime import datetime
 from CryptoDigger import Digger
-import json
-import math
 from CryptoOutput import Output
 import os
 import random
@@ -26,7 +21,6 @@ BLOCKCHAIN_FILE_PATH = "blockchain.json"
 OK = 200
 BAD_REQUEST = 400
 
-TRANSACTION_FEE_SHARE = 0.01
 
 class Node():
     __message_utils = None
@@ -179,6 +173,11 @@ class Node():
 
                 # add restored transaction
                 restored_transaction = Transaction.create_from_json(transaction_data)
+                message, is_valid = Transaction.is_consistent(restored_transaction)
+                if not is_valid:
+                    self.__logger.info(f"Transaction validated... {message}")
+                    return message, BAD_REQUEST
+                
                 self.__digger.add_transaction(restored_transaction)
 
                 self.__logger.info(message)
@@ -190,70 +189,32 @@ class Node():
             self.__logger.warning('Unhandled message type')
             return 'Unhandled message type', BAD_REQUEST
 
-    def calculate_transaction_data(self, sender: str, receiver: str, amount: int, message: str):
-        transaction_id = str(uuid.uuid4())
-        transaction_fee = math.ceil(amount * TRANSACTION_FEE_SHARE)
-        valid_inputs = self.__digger.get_inputs(sender)
-        self.__logger.info(f'valid_inputs: {len(valid_inputs)}')
-
-        available_balance = 0
-        for input in valid_inputs:
-            available_balance += input.get_amount()
-
-        spend_amount = transaction_fee + amount
-        if available_balance < spend_amount:
-            return f'Not enough account balance need {spend_amount} but has {available_balance}', BAD_REQUEST, None
-
-        outputs = [
-            Output(owner=receiver, amount=amount),
-        ]
-        change_amount = available_balance - spend_amount
-        if change_amount > 0:
-            outputs.append(Output(owner=sender, amount=change_amount))
-
-        self.__logger.info("Transaction data calculated...")
-
-        return_data = {
-            'transaction_id': transaction_id,
-            'transaction_fee': transaction_fee,
-            'valid_inputs': valid_inputs,
-            'outputs': outputs,
-        }
-
-        return "ok", OK, return_data
-
-    def add_transaction(self, sender: str, receiver: str, amount: int, message: str):
-        msg, status, calculated_transaction_data = self.calculate_transaction_data(sender, receiver, amount, message)
-
-        if status == BAD_REQUEST:
-            return msg, status
-
-        transaction, message, is_valid = Transaction.create_transaction(
-            key_manager = self.__key_manager,
-            logger = self.__logger,
-            transaction_id = calculated_transaction_data['transaction_id'],
-            transaction_fee = calculated_transaction_data['transaction_fee'],
-            inputs = calculated_transaction_data['valid_inputs'],
-            outputs = calculated_transaction_data['outputs'],
-            message = message
-        )
-
-        if not is_valid:
-            self.__logger.info(message)
-            return f'Invalid transaction: {message}', BAD_REQUEST
-
-        self.__digger.add_transaction(transaction)
-        return 'ok', OK
-
     def save_blockchain(self):
         self.__digger.__blockchain.save(BLOCKCHAIN_FILE_PATH)
 
-    def spread_candidate_block(self, candidate_block: Block):
-        # spread
-        payload = {
+    def spread_candidate_block(self, candidate_block: Block) -> None:
+        '''
+        Spread candidate block to all nodes with new transaction.
+        '''
+        self.spread_message({
             'type': 'new_block',
             'block': candidate_block.to_json()
-        }
+        })
+    
+    def spread_candidate_transaction(self, transaction: Transaction) -> None:
+        '''
+        Spread message to all nodes with new transaction.
+        '''
+        self.spread_message({
+            'type': 'new_transaction',
+            'transaction': transaction.to_json()
+        })
+    
+    def spread_message(self, payload: dict) -> None:
+        '''
+        Spread message to all known nodes.
+        Ignore 'Ignore address' if set.
+        '''
         frame = self.__message_utils.wrap_message(payload)
 
         nodes_that_reject = []
@@ -269,7 +230,6 @@ class Node():
 
             if not response.ok:
                 nodes_that_reject.append(node)
-        return True
 
     def get_digger(self):
         return self.__digger
@@ -306,46 +266,71 @@ class Node():
         return tree_structure
 
     def propagate_transaction(self, transaction_data: dict):
+        '''
+        Prepare transaction ready to add to blockchain and spread to all nodes.
+        '''
+        # check if structure of transaction request is valid
         message, is_valid = Transaction.is_transaction_request_valid(transaction_data, self.__logger)
         if not is_valid:
             self.__logger.info(message)
             return message, BAD_REQUEST
+         
+            
+        transaction_id = str(uuid.uuid4())
+        transaction_fee = Transaction.calculate_transaction_fee(transaction_data['amount'])
+        
+        # set inputs
+        inputs = None
+        if 'inputs' in transaction_data:
+            # convert inputs to object class
+            msg, is_valid = Input.is_list_valid(transaction_data['inputs'])
+            if not is_valid:
+                return msg, BAD_REQUEST
+            inputs = Input.from_list_json(transaction_data['inputs'])
+        else:
+            inputs = self.__digger.get_inputs(transaction_data['sender'])
+           
+        self.__logger.info(f'inputs: {len(inputs)}')
+                            
+        available_balance = sum([input.get_amount() for input in inputs])
 
-        msg, status, calculated_transaction_data = self.calculate_transaction_data(
-            sender = transaction_data['sender'],
-            receiver = transaction_data['receiver'],
-            amount = transaction_data['amount'],
-            message = transaction_data['message']
-        )
-        # could not calculate transaction data
-        if status == BAD_REQUEST:
-            self.__logger.info(msg)
-            return msg, status
-
+        spend_amount = transaction_fee + transaction_data['amount']
+        if available_balance <= spend_amount:
+            return f'Not enough account balance need {spend_amount} but has {available_balance}', BAD_REQUEST
+        
+        
+        # set outputs
+        outputs = [
+            Output(owner=transaction_data['receiver'], amount=transaction_data['amount']),
+        ]
+        change_amount = available_balance - spend_amount
+        if change_amount > 0:
+            outputs.append(Output(owner=transaction_data['sender'], amount=change_amount))
+            
+        # Create transaction object
         transaction, msg, is_valid = Transaction.create_transaction(
             key_manager = self.__key_manager,
             logger = self.__logger,
-            transaction_id = calculated_transaction_data['transaction_id'],
-            transaction_fee = calculated_transaction_data['transaction_fee'],
-            inputs = calculated_transaction_data['valid_inputs'],
-            outputs = calculated_transaction_data['outputs'],
+            transaction_id = transaction_id,
+            transaction_fee = transaction_fee,
+            inputs = inputs,
+            outputs = outputs,
             message = transaction_data['message']
         )
         if not is_valid:
             self.__logger.info(msg)
-            return f'Invalid transaction: {msg}', BAD_REQUEST
+            return f'Unable to create transaction: {msg}', BAD_REQUEST
+        
+        msg, is_valid = Transaction.is_consistent(transaction)
+        if not is_valid:
+            return f'Created transaction is inconsistent: {msg}', BAD_REQUEST
+        
+        # check if is valid for main blockchain
+        msg, is_valid = self.__digger.get_blockchain_tree().get_blockchain().is_valid_transaction_candidate(transaction)
+        if not is_valid:
+            return f'Not valid for main blockchain: {msg} - transaction: {transaction.to_json()}', BAD_REQUEST
 
         self.__logger.info("Attempting to broadcast transaction...")
 
-        transaction_payload = {
-            'type': 'new_transaction',
-            'transaction': transaction.to_json()
-        }
-        transaction_frame = self.__message_utils.wrap_message(transaction_payload)
-
-        # send transaction to everyone (except that one, we're ignoring)
-        for node in self.pub_list:
-            if node.address == self.__ignore_address:
-                continue
-            requests.post(url=f"http://{node.address}/message", json=transaction_frame)
+        self.spread_candidate_transaction(transaction)
         return "ok", OK

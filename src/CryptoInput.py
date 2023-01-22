@@ -3,6 +3,7 @@ from CryptoUtils import get_order_directory_recursively, is_valid
 from CryptoOutput import Output
 from logging import Logger
 
+BLOCK_PRICE_ID = 'block_mining_price'
 
 class Input(Output):
     __transaction_id: str = None
@@ -19,6 +20,9 @@ class Input(Output):
 
     def get_transaction_id(self) -> str:
         return self.__transaction_id
+    
+    def is_block_price(self):
+        return self.__transaction_id == BLOCK_PRICE_ID
 
     @staticmethod
     def output_to_input(output: Output, transaction_id: str, logger: Logger = None):
@@ -45,3 +49,19 @@ class Input(Output):
             }
         }
         return is_valid(config, data)
+    
+    @staticmethod
+    def is_list_valid(list_of_inputs: list[dict]) -> tuple[str, bool]:
+        for data in list_of_inputs:
+            msg, is_valid = Input.is_valid(data)
+            if not is_valid:
+                return msg, False
+        return 'Ok', True
+    
+    @staticmethod
+    def from_json(data: dict):
+        return Input(amount=data['amount'], transaction_id=data['transaction_id'], owner=data['owner'])
+    
+    @staticmethod
+    def from_list_json(data_list: list[dict]):
+        return [Input.from_json({**input}) for input in data_list]

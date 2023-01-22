@@ -1,5 +1,6 @@
 from CryptoBlock import Block
 from CryptoBlockchain import BlockChain
+from CryptoTransaction import Transaction
 from logging import Logger
 import json
 from functools import cmp_to_key
@@ -70,11 +71,22 @@ class BlockchainTree:
         return blocks
     
     def __compare_block_blockchains(self, bcb_a: list[list[Block]], bcb_b: list[list[Block]]):
+        '''
+        Compare function for func:get_blockchain.
+        
+        Returns:
+         -  1 for A <  B
+         - -1 for A >= B
+        '''
         if len(bcb_a) != len(bcb_b):
                 return 1 if len(bcb_a) < len(bcb_b) else -1
         return 0
     
     def get_blockchain(self) -> BlockChain | None:
+        '''
+        Returns main blockchain in blockchain tree.
+        If there is no block in blockchain tree - it returns None.
+        '''
         heads = self.__get_heads()
         if len(heads) == 0:
             return None
@@ -89,4 +101,45 @@ class BlockchainTree:
         return blockchain
 
     def get_all_blocks(self) -> list[Block]:
-        return [block for block in self.__blocks_map.values()]     
+        return [block for block in self.__blocks_map.values()]
+    
+    def get_all_transactions(self) -> list[Transaction]:
+        '''
+        Returns all transactions present in blockchain tree.
+        '''
+
+        blocks = self.get_all_blocks()
+        transactions = []
+        for block in blocks:
+            block_transations = block.get_transactions()
+            transactions.extend(block_transations)
+        return transactions
+    
+    def get_transactions_lost_in_forks(self,) -> list[Transaction]:
+        '''
+        Returns transactions lost in forks - out of main blockchain.
+        '''
+
+        blockchain = self.get_blockchain()
+        if blockchain is None:
+            self.__logger.warning('No blockchain in blockchainTree')
+            return []
+        blockchain_transactions = blockchain.get_transactions()
+        blockchain_transaction_ids = [transaction.get_transaction_id() for transaction in blockchain_transactions]
+        all_transactions = self.get_all_transactions()
+        lost_transactions = [transaction for transaction in all_transactions if transaction.get_transaction_id() not in blockchain_transaction_ids]
+        return lost_transactions
+    
+    def get_lost_transactions_ready_to_apply(self):
+        '''
+        Returns transations that have inputs not used before in chain.
+        '''
+        blockchain = self.get_blockchain()
+        lost_transactions = self.get_transactions_lost_in_forks()
+        ready_to_apply_transactions = []
+        for transaction in lost_transactions:
+            _, is_valid = blockchain.is_valid_transaction_candidate(transaction)
+            if is_valid:
+                ready_to_apply_transactions.append(transaction)
+        return ready_to_apply_transactions
+             
