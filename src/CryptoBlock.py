@@ -3,7 +3,7 @@ from CryptoTransactionPool import Transaction
 import hashlib
 import json
 
-difficulty_bits = 18    # 0 to 24 bits
+difficulty_bits = 17    # 0 to 24 bits
 target = 2 ** (256 - difficulty_bits)
 
 

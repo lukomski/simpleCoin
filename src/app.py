@@ -290,18 +290,15 @@ def read_message():
 def last_block_hash():
     return node.blockchain._blocks[-1].get_block_hash()
 
-
-@app.route("/validate", methods=["GET"])
-def validate_blockchain():
-    is_valid = node.blockchain.validate()
-    return {
-        "is_valid": str(is_valid)
-    }
-
-
 @app.route("/wallet", methods=['GET'])
 def get_wallet_balance():
     return node.get_wallet_balance(), 200
+
+@app.route("/make-double-spending", methods=['POST'])
+def make_double_spending():
+    data = request.get_json()
+    message, status = node.make_double_spending(data)
+    return message, status
 
 
 if __name__ == "__main__":

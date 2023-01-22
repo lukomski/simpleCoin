@@ -9,7 +9,10 @@ from CryptoTransaction import Transaction
 from threading import Thread
 from CryptoInput import Input
 import os
-from CryptoUtils import get_order_directory_recursively, encrypt_by_secret_key, decrypt_by_secret_key
+from CryptoUtils import (
+    is_double_spending_transaction_request_valid
+)
+
 import uuid
 import time
 from CryptoDigger import Digger
@@ -163,7 +166,7 @@ class Node():
             if transaction_rng < self.__transaction_process_chance:
                 transaction_data = payload['transaction']
 
-                self.__logger.info(str(transaction_data))
+                self.__logger.info(f"Received transaction candidate: {str(transaction_data)}")
 
                 message, is_valid = Transaction.is_valid(transaction_data, logger=self.__logger)
 
@@ -178,9 +181,14 @@ class Node():
                     self.__logger.info(f"Transaction validated... {message}")
                     return message, BAD_REQUEST
                 
+                # check if is valid for main blockchain
+                message, is_valid = self.__digger.get_blockchain_tree().get_blockchain().is_valid_transaction_candidate(restored_transaction)
+                if not is_valid:
+                    return f'Not valid for main blockchain: {message} - transaction: {restored_transaction.to_json()}', BAD_REQUEST
+
                 self.__digger.add_transaction(restored_transaction)
 
-                self.__logger.info(message)
+                self.__logger.info(f"Transaction added to transaction pool... {message}")
                 return message, OK
             else:
                 self.__logger.info("Transaction ignored")
@@ -215,6 +223,8 @@ class Node():
         Spread message to all known nodes.
         Ignore 'Ignore address' if set.
         '''
+        if (payload['type'] == 'new_transaction'):
+            self.__logger.info(f"Spreading transaction candidate... {payload}")
         frame = self.__message_utils.wrap_message(payload)
 
         nodes_that_reject = []
@@ -269,6 +279,7 @@ class Node():
         '''
         Prepare transaction ready to add to blockchain and spread to all nodes.
         '''
+        self.__logger.info("Propagating transaction to all nodes")
         # check if structure of transaction request is valid
         message, is_valid = Transaction.is_transaction_request_valid(transaction_data, self.__logger)
         if not is_valid:
@@ -333,4 +344,79 @@ class Node():
         self.__logger.info("Attempting to broadcast transaction...")
 
         self.spread_candidate_transaction(transaction)
+        return "ok", OK
+
+    def make_double_spending(self, transaction_data: dict):
+        # check if structure of transaction request is valid
+        message, is_valid = is_double_spending_transaction_request_valid(transaction_data)
+        if not is_valid:
+            self.__logger.info(message)
+            return message, BAD_REQUEST
+
+        # create transactions from received data
+        transaction_fee = Transaction.calculate_transaction_fee(transaction_data['amount'])
+
+        # set inputs
+        inputs = None
+        if 'inputs' in transaction_data:
+            # convert inputs to object class
+            msg, is_valid = Input.is_list_valid(transaction_data['inputs'])
+            if not is_valid:
+                return msg, BAD_REQUEST
+            inputs = Input.from_list_json(transaction_data['inputs'])
+        else:
+            inputs = self.__digger.get_inputs(transaction_data['sender'])
+
+        self.__logger.info(f'inputs: {len(inputs)}')
+
+        available_balance = sum([input.get_amount() for input in inputs])
+
+        spend_amount = transaction_fee + transaction_data['amount']
+        if available_balance <= spend_amount:
+            return f'Not enough account balance need {spend_amount} but has {available_balance}', BAD_REQUEST
+
+        transactions_to_spread = []
+        amount = transaction_data['amount']
+        for i in range(1, 3):
+            transaction_id = str(uuid.uuid4())
+            receiver = transaction_data['receiver' + str(i)]
+
+            # set outputs
+            outputs = [
+                Output(owner=receiver, amount=amount),
+            ]
+            change_amount = available_balance - spend_amount
+            if change_amount > 0:
+                outputs.append(Output(owner=transaction_data['sender'], amount=change_amount))
+
+            # Create transaction object
+            transaction, msg, is_valid = Transaction.create_transaction(
+                key_manager = self.__key_manager,
+                logger = self.__logger,
+                transaction_id = transaction_id,
+                transaction_fee = transaction_fee,
+                inputs = inputs,
+                outputs = outputs,
+                message = transaction_data['message']
+            )
+            if not is_valid:
+                self.__logger.info(msg)
+                return f'Unable to create transaction: {msg}', BAD_REQUEST
+
+            msg, is_valid = Transaction.is_consistent(transaction)
+            if not is_valid:
+                return f'Created transaction is inconsistent: {msg}', BAD_REQUEST
+
+            # check if is valid for main blockchain
+            msg, is_valid = self.__digger.get_blockchain_tree().get_blockchain().is_valid_transaction_candidate(transaction)
+            if not is_valid:
+                return f'Not valid for main blockchain: {msg} - transaction: {transaction.to_json()}', BAD_REQUEST
+
+            transactions_to_spread.append(transaction)
+
+        self.__digger.add_double_spending_transactions(transactions_to_spread)
+
+        for transaction in transactions_to_spread:
+            self.__digger.add_transaction(transaction)
+
         return "ok", OK

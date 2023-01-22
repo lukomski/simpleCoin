@@ -63,7 +63,35 @@
 			"response": []
 		},
 		{
-			"name": "add transaction Copy",
+			"name": "add transaction with setting inputs",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"message\": \"Some transaction message 2\",\r\n    \"amount\": 1,\r\n    \"sender\": \"f52092aa49e6bd267909b53489424360c9f4e33296c7163770f69980deab65c4\",\r\n    \"receiver\": \"burned\",\r\n    \"inputs\": [\r\n          {\r\n            \"amount\": 5,\r\n            \"owner\": \"950e5c385e93df1cd0ffa56f31ca3cc44d1c39473f38c62ad30e96f7bd52291e\",\r\n            \"transaction_id\": \"block_mining_price\"\r\n          }\r\n    ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:5000/transaction",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"transaction"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "make dobule spending",
 			"request": {
 				"method": "POST",
 				"header": [],
@@ -161,25 +189,6 @@
 					"port": "5001",
 					"path": [
 						"public-key"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "validate blockchain",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "http://localhost:5000/validate",
-					"protocol": "http",
-					"host": [
-						"localhost"
-					],
-					"port": "5000",
-					"path": [
-						"validate"
 					]
 				}
 			},

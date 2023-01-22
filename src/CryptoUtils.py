@@ -56,3 +56,24 @@ def is_valid(config, data):
         if requested_field not in config:
             return f'Found illicit field {requested_field}', False
     return 'ok', True
+
+def is_double_spending_transaction_request_valid(transaction_data: dict) -> tuple[str, bool]:
+    config = {
+        'amount': {
+            'type': int,
+        },
+        'message': {
+            'type': str,
+            'optional': True
+        },
+        'sender': {
+            'type': str
+        },
+        'receiver1': {
+            'type': str
+        },
+        'receiver2': {
+            'type': str
+        }
+    }
+    return is_valid(config, transaction_data)

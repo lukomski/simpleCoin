@@ -183,7 +183,7 @@ class BlockChain:
                         mined_blocks -= 1
                     else:
                         if logger:
-                            logger(
+                            logger.info(
                                 f'Input {input.to_json()} in transaction {transaction.to_json()} get block mining price which does not have')
                     continue
                 elif source_transaction_id not in transaction_sources:
